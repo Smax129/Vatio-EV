@@ -1,0 +1,1278 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0A7C78"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>html,body{margin:0}body{min-height:100vh}</style>
+<title>Vatio EV</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: columna móvil de una mano. Arriba el estado de la batería, debajo herramientas en tarjetas, barra de pestañas fija. Las cifras van en tipografía display y tabulares. */
+:root{
+  --bg:#F1F5F4; --surface:#FFFFFF; --surface2:#E7EEEC; --line:#D5DFDD; --fg:#0C1B1A; --muted:#55686A;
+  --accent:#0A7C78; --accent-ink:#FFFFFF; --accent-soft:#D3ECE9;
+  --ok:#1B7F4B; --ok-soft:#DDF1E6; --warn:#9A5B00; --warn-soft:#FBEBCF; --bad:#B8342B; --bad-soft:#F9DEDB;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --seq1:#BFE4DF; --seq2:#5FB7AF; --seq3:#0A6B67;
+  --f-display:'Bricolage Grotesque',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-body:'Instrument Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --r:18px; --r-sm:12px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A1413; --surface:#111E1D; --surface2:#182927; --line:#243836; --fg:#E6F1EF; --muted:#8CA5A2;
+    --accent:#3FCBC3; --accent-ink:#04201F; --accent-soft:#103936;
+    --ok:#4CC17F; --ok-soft:#12301F; --warn:#E7A93A; --warn-soft:#38290E; --bad:#EF7A70; --bad-soft:#3B1816;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --seq1:#164A46; --seq2:#2A8E87; --seq3:#8FE6DF;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A1413; --surface:#111E1D; --surface2:#182927; --line:#243836; --fg:#E6F1EF; --muted:#8CA5A2;
+  --accent:#3FCBC3; --accent-ink:#04201F; --accent-soft:#103936;
+  --ok:#4CC17F; --ok-soft:#12301F; --warn:#E7A93A; --warn-soft:#38290E; --bad:#EF7A70; --bad-soft:#3B1816;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --seq1:#164A46; --seq2:#2A8E87; --seq3:#8FE6DF;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45;padding-inline:16px;padding-block:0;-webkit-text-size-adjust:100%}
+.app{max-width:560px;margin:0 auto;min-height:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:1.3rem}
+h3{font-size:1rem}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:.82rem}
+.num{font-variant-numeric:tabular-nums}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;justify-content:space-between;padding-block:12px}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--f-display);font-weight:700;font-size:1.2rem;letter-spacing:-.02em}
+.brand svg{width:26px;height:26px}
+.iconbtn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
+.iconbtn svg{width:20px;height:20px;stroke:var(--fg);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+main{display:flex;flex-direction:column;gap:14px;padding-bottom:104px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card.plain{background:transparent;border-style:dashed}
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kv{background:var(--surface2);border-radius:var(--r-sm);padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kv b{font-family:var(--f-display);font-weight:600;font-size:1.1rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kv span{font-size:.78rem;color:var(--muted)}
+.big{font-family:var(--f-display);font-weight:600;font-size:2.6rem;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.big small{font-size:1.1rem;font-weight:500;color:var(--muted);letter-spacing:0;margin-left:3px}
+
+.seg{display:flex;background:var(--surface2);border-radius:999px;padding:3px;gap:2px}
+.seg button{flex:1;border:0;background:transparent;border-radius:999px;padding:8px 6px;font-weight:500;font-size:.88rem;color:var(--muted);min-width:0}
+.seg button.on{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.14)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:.84rem;color:var(--fg);min-width:40px}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:.78rem;font-weight:600;white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.tag{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:.72rem;color:var(--muted);white-space:nowrap}
+
+label.f{display:flex;flex-direction:column;gap:5px;font-size:.8rem;color:var(--muted);min-width:0}
+input[type=number],input[type=text],input[type=date],select{width:100%;background:var(--surface2);border:1px solid transparent;border-radius:var(--r-sm);padding:10px 12px;font-size:16px;color:var(--fg);min-width:0;font-family:var(--f-body)}
+input:focus,select:focus{border-color:var(--accent);outline:none}
+input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0}
+.fieldrow{display:flex;align-items:center;gap:8px}
+.unit{font-size:.8rem;color:var(--muted);white-space:nowrap}
+.btn{border:0;border-radius:var(--r-sm);padding:11px 16px;font-weight:600;background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:var(--surface2);color:var(--fg)}
+.btn.sm{padding:7px 12px;font-size:.84rem}
+.link{color:var(--accent);font-weight:500}
+.rowl{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line);min-width:0}
+.rowl:first-child{border-top:0}
+.rowl .t{min-width:0;display:flex;flex-direction:column}
+.rowl .t b{font-weight:500;overflow-wrap:anywhere}
+.x{border:0;background:var(--surface2);border-radius:var(--r-sm);width:40px;height:40px;font-size:1.2rem;color:var(--muted);flex:0 0 auto}
+.stat{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);min-width:0}
+.stat b{font-family:var(--display);font-size:1.15rem;font-weight:600}
+.note{border-radius:var(--r-sm);padding:10px 12px;background:var(--surface2);font-size:.88rem}
+.note.warn{background:var(--warn-soft);color:var(--warn)}
+.note.ok{background:var(--ok-soft);color:var(--ok)}
+
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
+.tabbar nav{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr);gap:0}
+.tabbar button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;color:var(--muted);font-size:.72rem;font-weight:500;border-radius:12px}
+.tabbar button svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tabbar button[aria-current="page"]{color:var(--accent)}
+
+.gauge{width:100%;height:auto;display:block}
+.svt{fill:var(--muted);font:10px var(--f-body)}
+.svt.fg{fill:var(--fg)}
+.svt.lbl{font-weight:600}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px;border-radius:2px}
+.legend i.circ{border-radius:50%}
+.legend i.dia{transform:rotate(45deg);border-radius:1px}
+.bars{display:flex;flex-direction:column;gap:10px}
+.barrow{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
+.barrow .trk{grid-column:1/-1;height:10px;border-radius:99px;background:var(--surface2);overflow:hidden}
+.barrow .trk i{display:block;height:100%;background:var(--muted);opacity:.55;border-radius:99px}
+.barrow.best .trk i{background:var(--accent);opacity:1}
+details.tbl summary{cursor:pointer;color:var(--accent);font-size:.84rem;font-weight:500}
+.tblwrap{overflow-x:auto;margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:500}
+.tip{position:fixed;z-index:50;background:var(--fg);color:var(--bg);border-radius:10px;padding:7px 10px;font-size:.8rem;line-height:1.35;pointer-events:none;white-space:pre-line;max-width:230px}
+.toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:.86rem;z-index:60;max-width:90vw;text-align:center}
+.planbox{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--line);border-radius:var(--r-sm)}
+.days{display:flex;gap:6px}
+.days .chip{flex:1;padding:8px 0;text-align:center;min-width:0}
+@media (max-width:420px){ .big{font-size:2.3rem} }
+#gmap{height:320px;border-radius:var(--r-sm);border:1px solid var(--line);overflow:hidden;background:var(--surface2);isolation:isolate}
+.leaflet-container{font-family:var(--f-body)}
+.dark-tiles .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9)}
+.gpw{background:none;border:0}
+.gp{display:block;width:22px;height:22px;border-radius:50%;background:var(--surface);border:3px solid var(--muted);box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.gp.free{border-color:var(--accent);background:var(--accent)}
+.gp.sel{outline:3px solid var(--fg);outline-offset:2px}
+.gp.off{opacity:.45}
+.mapbar{display:flex;gap:8px;flex-wrap:wrap}
+.mapbar input{flex:1;min-width:140px}
+.hero{background:linear-gradient(135deg,var(--accent-soft),var(--surface));position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:var(--accent);opacity:.12}
+.rowbtn{background:none;border:0;padding:0;text-align:left;display:flex;min-width:0;flex:1}
+@media (prefers-reduced-motion:no-preference){
+  main.vin>*{animation:rise .5s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*60ms)}
+  @keyframes rise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+  .gauge .fillc{transform-box:fill-box;transform-origin:left center;animation:fillx .8s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(.25s + var(--k,0)*70ms)}
+  @keyframes fillx{from{transform:scaleX(0)}to{transform:none}}
+  .barrow .trk i{transform-origin:left center;animation:fillx .8s cubic-bezier(.2,.8,.2,1) both .2s}
+  .tabbar button{transition:color .2s,background .25s,transform .15s}
+  .tabbar button[aria-current="page"]{background:var(--accent-soft)}
+  .tabbar button[aria-current="page"] svg{animation:pop .4s cubic-bezier(.3,1.6,.5,1)}
+  @keyframes pop{0%{transform:scale(.7)}100%{transform:scale(1)}}
+  .tabbar button:active,.btn:active,.chip:active{transform:scale(.94)}
+  .btn,.chip,.seg button{transition:transform .15s,background .2s,color .2s,border-color .2s}
+  .gp{animation:pinpop .45s cubic-bezier(.3,1.7,.5,1) both}
+  @keyframes pinpop{from{transform:scale(0)}to{transform:scale(1)}}
+  .rowl{transition:background .2s}
+  .toast{animation:rise .3s ease-out both}
+}
+@media (prefers-reduced-motion:reduce){.card{animation:none}}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><svg viewBox="0 0 28 28" aria-hidden="true"><rect x="1.5" y="8" width="22" height="12" rx="3.5" fill="none" stroke="var(--accent)" stroke-width="2.2"/><rect x="24.5" y="12" width="2.5" height="4" rx="1" fill="var(--accent)"/><path d="M13.5 10.5l-3.5 4h3l-1 3.5 4-4.5h-3z" fill="var(--accent)"/></svg>Vatio</div>
+    <button class="iconbtn" id="themeBtn" type="button" aria-label="Cambiar tema claro u oscuro"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/></svg></button>
+  </header>
+  <main id="main"></main>
+</div>
+<div class="tabbar"><nav id="tabs" aria-label="Secciones"></nav></div>
+<div class="tip" id="tip" hidden></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+'use strict';
+var KEY='vatio.v1';
+function $(s,r){return (r||document).querySelector(s)}
+function $$(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))}
+function nf(v,d){d=d||0;return Number(v).toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d})}
+function eur(v,d){d=(d===undefined)?2:d;return Number(v).toLocaleString('es-ES',{style:'currency',currency:'EUR',minimumFractionDigits:d,maximumFractionDigits:d})}
+function clamp(v,a,b){return Math.min(b,Math.max(a,v))}
+function num(v,def){var n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:(def||0)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function median(a){var b=a.slice().sort(function(x,y){return x-y}),n=b.length;if(!n)return null;return n%2?b[(n-1)/2]:(b[n/2-1]+b[n/2])/2}
+function fmtH(h){if(!isFinite(h)||h<=0)return '0 min';var m=Math.round(h*60);var hh=Math.floor(m/60),mm=m%60;return hh>0?(hh+' h '+(mm<10?'0':'')+mm+' min'):(mm+' min')}
+function iso(d){var m=d.getMonth()+1,day=d.getDate();return d.getFullYear()+'-'+(m<10?'0':'')+m+'-'+(day<10?'0':'')+day}
+function parseD(s){var p=String(s).split('-');return new Date(+p[0],+p[1]-1,+p[2])}
+function daysAgoStr(n){var d=new Date();d.setDate(d.getDate()-n);return iso(d)}
+function dmy(s){var p=String(s).split('-');return p.length===3?(p[2]+'/'+p[1]+'/'+p[0].slice(2)):s}
+function hh2(h){return (h<10?'0':'')+h+':00'}
+function uid(){return 'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function round(v,d){var k=Math.pow(10,d||0);return Math.round(v*k)/k}
+
+/* ---------- Estado ---------- */
+/* Catálogo orientativo (octubre 2026). Fuentes: artículos de comparativas; no son ofertas verificadas en la web de cada compañía. */
+var CAT_DATE='oct. 2026';
+function catPlans(){return [
+  {id:'c1',n:'Niba Zen · fijo',kind:'fija',punta:0.156,llano:0.156,valle:0.156,fee:0},
+  {id:'c2',n:'Octopus Relax · fijo',kind:'fija',punta:0.164,llano:0.164,valle:0.164,fee:0},
+  {id:'c3',n:'Endesa Recarga en Casa · fijo',kind:'fija',punta:0.163,llano:0.163,valle:0.163,fee:0},
+  {id:'c4',n:'Iberdrola Online · fijo',kind:'fija',punta:0.19,llano:0.19,valle:0.19,fee:0},
+  {id:'c5',n:'Repsol Vehículo Eléctrico · fijo',kind:'fija',punta:0.1999,llano:0.1999,valle:0.1999,fee:0},
+  {id:'c6',n:'Niba Tres · por horas',kind:'horaria',punta:0.251,llano:0.187,valle:0.111,fee:0},
+  {id:'c7',n:'Octopus 3 · por horas',kind:'horaria',punta:0.21,llano:0.159,valle:0.142,fee:0},
+  {id:'c8',n:'Iberdrola Online 3 Periodos',kind:'horaria',punta:0.275,llano:0.206,valle:0.164,fee:0}
+]}
+function catPub(){return [
+  {id:'d1',n:'Pago por uso · media',fee:0,ac:0.38,dc:0.52},
+  {id:'d2',n:'Iberdrola · pago por uso',fee:0,ac:0.25,dc:0.49},
+  {id:'d3',n:'Repsol Waylet · rápida',fee:0,ac:0.38,dc:0.42},
+  {id:'d4',n:'Endesa X Way · pago por uso',fee:0,ac:0.38,dc:0.55},
+  {id:'d5',n:'Ionity · sin bono (solo rápida)',fee:0,ac:0.38,dc:0.65},
+  {id:'d6',n:'Ionity Movement (solo rápida)',fee:5.99,ac:0.38,dc:0.46},
+  {id:'d7',n:'Ionity Power (solo rápida)',fee:11.99,ac:0.38,dc:0.37},
+  {id:'d8',n:'Tesla Supercharger · con bono (solo Tesla)',fee:9.99,ac:0.38,dc:0.32}
+]}
+function defaults(){
+  var s={
+    theme:'auto', soc:55,
+    car:{name:'Mi eléctrico',nominal:60,cons:16.5,ac:11,dc:120},
+    price:{casa:0.11,ac:0.35,dc:0.55},
+    eff:{casa:0.90,ac:0.93,dc:0.96},
+    gas:{price:1.55,l100:6.5},
+    routine:{kmWeek:250,homeShare:80,kw:7.4,start:23,days:[1,2,3,4,5]},
+    plans:catPlans(),
+    pub:catPub(),
+    cat:2,
+    pubKwh:100, pubDc:70,
+    spots:[], trip:{km:400,speed:120,temp:15,soc:90,arr:10},
+    log:[], reads:[]
+  };
+  seed(s);
+  return s;
+}
+function seed(s){
+  var rows=[[97,'casa',24,80],[90,'casa',30,85],[83,'dc',12,80],[76,'casa',28,82],[69,'casa',35,80],[62,'ac',20,75],[55,'casa',31,80],[48,'casa',26,80],[41,'dc',10,78],[34,'casa',33,80],[27,'casa',29,82],[20,'casa',36,80],[13,'casa',27,80],[6,'casa',31,80]];
+  var noise=[0.01,-0.012,0.008,-0.006,0.012,-0.01,0.004,0.009,-0.008,0.006,-0.012,0.01,-0.004,0.007];
+  var odo=18240;
+  s.log=rows.map(function(r,i){
+    var soh=93.4+2.0*(r[0]/97);
+    var cap=s.car.nominal*soh/100;
+    var kwh=round(cap*(r[3]-r[2])/100/s.eff[r[1]]*(1+noise[i]),1);
+    var km=Math.round(kwh*s.eff[r[1]]/(s.car.cons/100)*(0.98+noise[i]*2));
+    if(i>0)odo+=km;
+    return {id:'ex'+i,date:daysAgoStr(r[0]),type:r[1],place:r[1]==='casa'?'Casa':(r[1]==='dc'?'Cargador rápido':'Parking'),from:r[2],to:r[3],kwh:kwh,cost:round(kwh*s.price[r[1]],2),odo:odo,ex:true};
+  });
+  s.reads=[{id:'exr0',date:daysAgoStr(40),pct:94,note:'Lectura de ejemplo',ex:true}];
+}
+function merge(base,o){
+  if(!o||typeof o!=='object')return base;
+  for(var k in o){base[k]=o[k]}
+  ['car','price','eff','gas','routine'].forEach(function(k){var d=defaults()[k];for(var j in d){if(base[k][j]===undefined)base[k][j]=d[j]}});
+  if(o.cat!==2&&Array.isArray(base.plans)&&Array.isArray(base.pub)&&base.plans.every(function(p){return /ejemplo/.test(p.n)})&&base.pub.every(function(p){return /ejemplo/.test(p.n)})){base.plans=catPlans();base.pub=catPub()}
+  base.cat=2;
+  if(!Array.isArray(base.spots))base.spots=[];
+  if(!base.trip||typeof base.trip!=='object')base.trip={};
+  var dt=defaults().trip;for(var tj in dt){if(typeof base.trip[tj]!=='number')base.trip[tj]=dt[tj]}
+  if(!Array.isArray(base.log))base.log=[];if(!Array.isArray(base.reads))base.reads=[];
+  return base;
+}
+function loadLocal(){
+  try{var r=localStorage.getItem(KEY);if(r)return merge(defaults(),JSON.parse(r))}catch(e){}
+  return defaults();
+}
+var S=loadLocal();
+
+/* ---------- Guardado: cuenta (db) con copia local ---------- */
+var DBREF=null,dbReady=false,dirty=false,saveT=null,saving=false,pending=false;
+function save(){
+  dirty=true;
+  try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+  clearTimeout(saveT);saveT=setTimeout(flush,700);
+}
+function flush(){
+  if(!DBREF||!dbReady)return;
+  if(saving){pending=true;return}
+  saving=true;pending=false;
+  var body;try{body=JSON.parse(JSON.stringify(S))}catch(e){saving=false;return}
+  DBREF.set({v:1,updated:Date.now(),state:body}).then(function(){dirty=false},function(e){
+    toast('No se pudo guardar en tu cuenta. Los datos siguen en este dispositivo.');
+  }).then(function(){saving=false;if(pending)flush()});
+}
+function initStore(){
+  if(!(window.claude&&window.claude.use))return;
+  Promise.all([window.claude.use('user'),window.claude.use('db')]).then(function(r){
+    var user=r[0],db=r[1];
+    if(!user||!db)return;
+    return user.id().then(function(id){
+      if(!id)return;
+      DBREF=db.doc('data/users/'+id+'/state');
+      return DBREF.get().then(function(snap){
+        var d=snap.exists?snap.data():null;
+        if(d&&d.state&&!dirty){S=merge(defaults(),d.state);applyTheme();render()}
+        dbReady=true;
+        if(dirty||!snap.exists)flush();
+      });
+    });
+  }).catch(function(){});
+}
+
+/* ---------- Modelo ---------- */
+function fTemp(T){return 1+Math.max(0,20-T)*0.012+Math.max(0,T-25)*0.006}
+function periodOf(day,h){
+  if(day===0||day===6)return 'valle';
+  if(h<8)return 'valle';
+  if(h<10)return 'llano';
+  if(h<14)return 'punta';
+  if(h<18)return 'llano';
+  if(h<22)return 'punta';
+  return 'llano';
+}
+function sohPoints(){
+  var pts=[];
+  S.log.forEach(function(l){
+    var d=l.to-l.from;
+    if(!(d>=30)||!(l.kwh>0))return;
+    var cap=l.kwh*(S.eff[l.type]||0.9)/(d/100);
+    var soh=cap/S.car.nominal*100;
+    if(soh<40||soh>115)return;
+    pts.push({id:l.id,date:l.date,soh:soh,src:'calc',ex:!!l.ex});
+  });
+  S.reads.forEach(function(r){pts.push({id:r.id,date:r.date,soh:r.pct,src:'manual',ex:!!r.ex})});
+  pts.sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0)});
+  return pts;
+}
+function sohSummary(){
+  var pts=sohPoints();
+  var calc=pts.filter(function(p){return p.src==='calc'});
+  var man=pts.filter(function(p){return p.src==='manual'});
+  var res={pts:pts,n:calc.length,man:man.length?man[man.length-1]:null,val:null,lo:null,hi:null,basis:'',used:0};
+  var use=calc.slice(-6);
+  if(use.length>=2){var v=use.map(function(p){return p.soh});res.val=median(v);res.lo=Math.min.apply(null,v);res.hi=Math.max.apply(null,v);res.basis='calc';res.used=use.length}
+  else if(man.length){res.val=man[man.length-1].soh;res.lo=res.hi=res.val;res.basis='manual';res.used=1}
+  if(res.val!==null)res.cap=S.car.nominal*res.val/100;
+  var last=pts.length?pts[pts.length-1].date:null;
+  res.age=last?Math.round((Date.now()-parseD(last).getTime())/864e5):null;
+  return res;
+}
+function verdict(v){
+  if(v>=95)return ['ok','Como nueva'];
+  if(v>=90)return ['ok','Muy buena'];
+  if(v>=85)return ['ok','Buena'];
+  if(v>=80)return ['warn','Aceptable'];
+  if(v>=70)return ['warn','Revisa tu garantía'];
+  return ['bad','Degradada'];
+}
+function trend(pts){
+  var n=pts.length;if(n<4)return null;
+  var t0=parseD(pts[0].date).getTime(),sx=0,sy=0,sxx=0,sxy=0;
+  pts.forEach(function(p){var x=(parseD(p.date).getTime()-t0)/864e5,y=p.soh;sx+=x;sy+=y;sxx+=x*x;sxy+=x*y});
+  var span=(parseD(pts[n-1].date).getTime()-t0)/864e5;if(span<90)return null;
+  var den=n*sxx-sx*sx;if(den===0)return null;
+  var b=(n*sxy-sx*sy)/den,a=(sy-b*sx)/n;
+  return {a:a,b:b,span:span,perYear:b*365,t0:t0};
+}
+function habits(){
+  var from=new Date();from.setDate(from.getDate()-90);var f=iso(from);
+  var L=S.log.filter(function(l){return l.date>=f});
+  var tot=L.reduce(function(a,l){return a+l.kwh},0),dc=L.filter(function(l){return l.type==='dc'}).reduce(function(a,l){return a+l.kwh},0);
+  var from30=new Date();from30.setDate(from30.getDate()-30);var f30=iso(from30);
+  var full=S.log.filter(function(l){return l.date>=f30&&l.to>=98}).length;
+  var low=L.filter(function(l){return l.from<=8}).length;
+  var avgTo=L.length?L.reduce(function(a,l){return a+l.to},0)/L.length:0;
+  return {n:L.length,dcShare:tot?dc/tot*100:0,full:full,low:low,avgTo:avgTo};
+}
+function monthKey(s){return String(s).slice(0,7)}
+function consStats(){
+  var L=S.log.filter(function(l){return l.odo>0}).sort(function(a,b){return a.odo-b.odo});
+  var km=0,kwh=0,cost=0;
+  for(var i=1;i<L.length;i++){var d=L[i].odo-L[i-1].odo;if(d>0&&d<2000){km+=d;kwh+=L[i].kwh;cost+=L[i].cost}}
+  return {km:km,kwh:kwh,cost:cost,cons:km?kwh/km*100:0,per100:km?cost/km*100:0,save:km*S.gas.l100/100*S.gas.price-cost};
+}
+function monthTotals(key){
+  var L=S.log.filter(function(l){return monthKey(l.date)===key});
+  return {n:L.length,kwh:L.reduce(function(a,l){return a+l.kwh},0),cost:L.reduce(function(a,l){return a+l.cost},0)};
+}
+function monthSeries(){
+  var out=[],d=new Date();d.setDate(1);
+  for(var i=5;i>=0;i--){
+    var x=new Date(d.getFullYear(),d.getMonth()-i,1),key=x.getFullYear()+'-'+(x.getMonth()+1<10?'0':'')+(x.getMonth()+1);
+    var o={key:key,label:x.toLocaleDateString('es-ES',{month:'short'}).replace('.',''),casa:0,ac:0,dc:0};
+    S.log.forEach(function(l){if(monthKey(l.date)===key)o[l.type]+=l.cost});
+    o.total=o.casa+o.ac+o.dc;out.push(o);
+  }
+  return out;
+}
+/* Simulación de la rutina de carga en casa */
+function weeklyKwh(r){return r.kmWeek*r.homeShare/100*S.car.cons/100/S.eff.casa}
+function simRoutine(r,startH){
+  var out={punta:0,llano:0,valle:0},hours=[];for(var i=0;i<24;i++)hours.push(0);
+  var days=r.days||[],kw=Math.max(0.5,r.kw),kwhWeek=weeklyKwh(r);
+  if(!days.length||kwhWeek<=0)return {e:out,hours:hours,week:0};
+  var per=kwhWeek/days.length;
+  days.forEach(function(d,idx){
+    var rem=per,h=startH,day=d,g=0;
+    while(rem>1e-9&&g++<400){
+      var e=Math.min(kw,rem);out[periodOf(day,h)]+=e;if(idx===0)hours[h]+=e;rem-=e;h++;if(h>=24){h=0;day=(day+1)%7}
+    }
+  });
+  var f=52/12;
+  return {e:{punta:out.punta*f,llano:out.llano*f,valle:out.valle*f},hours:hours,week:kwhWeek};
+}
+function planCost(p,e){return e.punta*p.punta+e.llano*p.llano+e.valle*p.valle+(p.fee||0)}
+function planRanking(startH){
+  var sim=simRoutine(S.routine,startH);
+  var rows=S.plans.map(function(p){return {p:p,cost:planCost(p,sim.e)}}).sort(function(a,b){return a.cost-b.cost});
+  return {rows:rows,sim:sim};
+}
+function bestStart(p){
+  var best=null;
+  for(var h=0;h<24;h++){var s=simRoutine(S.routine,h);var c=planCost(p,s.e);if(!best||c<best.cost-1e-9)best={h:h,cost:c}}
+  return best;
+}
+function pubUnit(p){var s=S.pubDc/100;return s*p.dc+(1-s)*p.ac}
+function pubCost(p,kwh){return p.fee+kwh*pubUnit(p)}
+function capNow(){var s=sohSummary();return S.car.nominal*(s.val!==null?s.val/100:1)}
+
+/* ---------- Interfaz ---------- */
+var ICON={
+  home:'<path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>',
+  bat:'<rect x="2.5" y="7.5" width="16" height="9" rx="2.5"/><path d="M21 10.5v3M6 10.5v3M10 10.5v3"/>',
+  bolt:'<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>',
+  tag:'<path d="M20 12l-8 8-9-9V4h7z"/><circle cx="8" cy="8" r="1.3"/>',
+  pin:'<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+  set:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'
+};
+var TABS=[['inicio','Inicio',ICON.home],['bateria','Batería',ICON.bat],['cargas','Cargas',ICON.bolt],['tarifas','Tarifas',ICON.tag],['gratis','Gratis',ICON.pin],['ajustes','Ajustes',ICON.set]];
+var tab='inicio';
+var main=$('#main');
+function seg(opts,cur,id){return '<div class="seg"'+(id?' id="'+id+'"':'')+' role="tablist">'+opts.map(function(o){return '<button type="button" role="tab" aria-selected="'+(o[0]===cur)+'" class="'+(o[0]===cur?'on':'')+'" data-v="'+o[0]+'">'+o[1]+'</button>'}).join('')+'</div>'}
+function onSeg(root,fn){$$('.seg button',root).forEach(function(b){b.addEventListener('click',function(){fn(b.dataset.v)})})}
+function kv(v,l){return '<div class="kv"><b>'+v+'</b><span>'+l+'</span></div>'}
+function fld(id,label,val,o){o=o||{};var txt=(o.type==='text'||o.type==='date');return '<label class="f" for="'+id+'">'+label+'<span class="fieldrow"><input id="'+id+'" type="'+(o.type||'number')+'" '+(txt?'':'inputmode="decimal" step="any"')+(o.min!==undefined?' min="'+o.min+'"':'')+(o.max!==undefined?' max="'+o.max+'"':'')+' value="'+esc(val)+'" autocomplete="off"'+(o.data?' '+o.data:'')+'>'+(o.unit?'<span class="unit">'+o.unit+'</span>':'')+'</span></label>'}
+var toastT;
+function toast(msg){
+  var t=$('.toast');if(t)t.remove();
+  t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.textContent=msg;document.body.appendChild(t);
+  clearTimeout(toastT);toastT=setTimeout(function(){t.remove()},2600);
+}
+function applyTheme(){
+  var r=document.documentElement;
+  if(S.theme==='light'||S.theme==='dark')r.setAttribute('data-theme',S.theme);else r.removeAttribute('data-theme');
+}
+function isDark(){
+  var t=document.documentElement.getAttribute('data-theme');
+  if(t)return t==='dark';
+  return !!(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+/* Globos de ayuda: se muestran al pasar o tocar cualquier elemento con data-tip */
+var tipEl=$('#tip');
+function showTip(el){
+  var t=el.getAttribute('data-tip');if(!t){hideTip();return}
+  tipEl.textContent=t;tipEl.hidden=false;
+  var r=el.getBoundingClientRect(),w=tipEl.offsetWidth,h=tipEl.offsetHeight;
+  var x=clamp(r.left+r.width/2-w/2,8,window.innerWidth-w-8),y=r.top-h-8;if(y<8)y=r.bottom+8;
+  tipEl.style.left=x+'px';tipEl.style.top=y+'px';
+}
+function hideTip(){tipEl.hidden=true}
+document.addEventListener('pointerover',function(e){var t=e.target.closest&&e.target.closest('[data-tip]');if(t)showTip(t);else hideTip()});
+document.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('[data-tip]');if(t)showTip(t);else hideTip()});
+window.addEventListener('scroll',hideTip,true);
+
+/* ---------- Gráficas ---------- */
+function gaugeSVG(val){
+  var cells=10,w=26,gap=4,x0=6,y0=8,hgt=40;
+  var s='<svg class="gauge" viewBox="0 0 330 56" role="img" aria-label="Salud de la batería '+(val===null?'sin datos':nf(val,0)+' por ciento')+'">'
+   +'<rect x="1.5" y="1.5" width="297" height="53" rx="12" fill="none" stroke="var(--line)" stroke-width="3"/><rect x="305" y="19" width="12" height="18" rx="4" fill="var(--line)"/>';
+  for(var i=0;i<cells;i++){
+    var x=x0+4+i*(w+gap)+0,frac=val===null?0:clamp((val-i*10)/10,0,1);
+    s+='<rect x="'+x+'" y="'+y0+'" width="'+w+'" height="'+hgt+'" rx="5" fill="var(--surface2)"/>';
+    if(frac>0)s+='<rect class="fillc" style="--k:'+i+'" x="'+x+'" y="'+y0+'" width="'+(w*frac).toFixed(1)+'" height="'+hgt+'" rx="5" fill="var(--accent)"/>';
+  }
+  return s+'</svg>';
+}
+function sohChart(pts,tr){
+  if(pts.length<2)return '<p class="muted small">Con dos o más estimaciones aparece aquí la gráfica.</p>';
+  var W=340,H=210,l=34,r=10,t=12,b=26,pw=W-l-r,ph=H-t-b;
+  var t0=parseD(pts[0].date).getTime(),t1=parseD(pts[pts.length-1].date).getTime();
+  var span=Math.max(30,(t1-t0)/864e5);
+  var vals=pts.map(function(p){return p.soh});
+  var ymin=Math.max(40,Math.floor((Math.min.apply(null,vals)-4)/5)*5),ymax=Math.max(100,Math.ceil((Math.max.apply(null,vals)+1)/5)*5);
+  if(ymax-ymin<15)ymin=ymax-15;
+  function X(d){return l+d/span*pw}
+  function Y(v){return t+ph-(v-ymin)/(ymax-ymin)*ph}
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Salud de la batería a lo largo del tiempo">';
+  for(var v=ymin;v<=ymax;v+=5){s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="var(--line)" stroke-width="1"/><text class="svt" x="'+(l-6)+'" y="'+(Y(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>'}
+  if(80>=ymin&&80<=ymax)s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(80).toFixed(1)+'" y2="'+Y(80).toFixed(1)+'" stroke="var(--warn)" stroke-width="1.2" stroke-dasharray="4 3"/><text class="svt" x="'+(W-r)+'" y="'+(Y(80)-4).toFixed(1)+'" text-anchor="end" style="fill:var(--warn)">80 %</text>';
+  if(tr){var y0=tr.a,y1=tr.a+tr.b*span;s+='<line x1="'+X(0).toFixed(1)+'" y1="'+Y(clamp(y0,ymin,ymax)).toFixed(1)+'" x2="'+X(span).toFixed(1)+'" y2="'+Y(clamp(y1,ymin,ymax)).toFixed(1)+'" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4" opacity=".7"/>'}
+  var ticks=[0,span/2,span];
+  ticks.forEach(function(d,i){var dt=new Date(t0+d*864e5);s+='<text class="svt" x="'+X(d).toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+(i===0?'start':(i===2?'end':'middle'))+'">'+dt.toLocaleDateString('es-ES',{day:'numeric',month:'short'}).replace('.','')+'</text>'});
+  pts.forEach(function(p){
+    var d=(parseD(p.date).getTime()-t0)/864e5,x=X(d),y=Y(p.soh);
+    var tip=dmy(p.date)+'\n'+nf(p.soh,1)+' %\n'+(p.src==='calc'?'Estimada con una carga':'Lectura manual')+(p.ex?' (ejemplo)':'');
+    if(p.src==='calc')s+='<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>';
+    else s+='<rect x="'+(x-5).toFixed(1)+'" y="'+(y-5).toFixed(1)+'" width="10" height="10" rx="1.5" fill="var(--s2)" stroke="var(--surface)" stroke-width="2" transform="rotate(45 '+x.toFixed(1)+' '+y.toFixed(1)+')"/>';
+    s+='<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="14" fill="transparent" data-tip="'+esc(tip)+'"/>';
+  });
+  return s+'</svg>';
+}
+function monthChart(ms){
+  var max=Math.max.apply(null,ms.map(function(m){return m.total}).concat([1]));
+  var ymax=Math.ceil(max/10)*10;if(ymax<10)ymax=10;
+  var W=340,H=200,l=34,r=8,t=18,b=26,pw=W-l-r,ph=H-t-b,bw=pw/ms.length;
+  function Y(v){return t+ph-v/ymax*ph}
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Gasto en carga por mes">';
+  [0,ymax/2,ymax].forEach(function(v){s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="var(--line)"/><text class="svt" x="'+(l-6)+'" y="'+(Y(v)+3).toFixed(1)+'" text-anchor="end">'+nf(v,0)+' €</text>'});
+  var cols={casa:'var(--s1)',ac:'var(--s2)',dc:'var(--s3)'},names={casa:'Casa',ac:'Pública lenta',dc:'Pública rápida'};
+  ms.forEach(function(m,i){
+    var x=l+i*bw+bw*0.16,w=bw*0.68,acc=0;
+    ['casa','ac','dc'].forEach(function(k){
+      if(m[k]<=0)return;
+      var y1=Y(acc+m[k]),y0=Y(acc),hh=Math.max(0,y0-y1-2);
+      s+='<rect x="'+x.toFixed(1)+'" y="'+y1.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+hh.toFixed(1)+'" rx="3" fill="'+cols[k]+'" data-tip="'+esc(m.label+' · '+names[k]+'\n'+eur(m[k]))+'"/>';
+      acc+=m[k];
+    });
+    if(m.total>0)s+='<text class="svt fg lbl" x="'+(x+w/2).toFixed(1)+'" y="'+(Y(m.total)-5).toFixed(1)+'" text-anchor="middle">'+nf(m.total,0)+'</text>';
+    s+='<text class="svt" x="'+(x+w/2).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle">'+esc(m.label)+'</text>';
+  });
+  return s+'</svg>';
+}
+function startChart(p,cur){
+  var costs=[];for(var h=0;h<24;h++)costs.push(planCost(p,simRoutine(S.routine,h).e));
+  var min=Math.min.apply(null,costs),max=Math.max.apply(null,costs);
+  var W=340,H=170,l=34,r=6,t=10,b=24,pw=W-l-r,ph=H-t-b,bw=pw/24;
+  var ymax=Math.ceil(max/5)*5;if(ymax<=0)ymax=5;
+  function Y(v){return t+ph-v/ymax*ph}
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Coste mensual según la hora de inicio de la carga">';
+  [0,ymax/2,ymax].forEach(function(v){s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="var(--line)"/><text class="svt" x="'+(l-6)+'" y="'+(Y(v)+3).toFixed(1)+'" text-anchor="end">'+nf(v,0)+' €</text>'});
+  costs.forEach(function(c,h){
+    var x=l+h*bw+bw*0.15,w=bw*0.7,best=Math.abs(c-min)<1e-9;
+    s+='<rect x="'+x.toFixed(1)+'" y="'+Y(c).toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+(t+ph-Y(c)).toFixed(1)+'" rx="2" fill="'+(best?'var(--accent)':'var(--muted)')+'" opacity="'+(best?'1':'.45')+'"'+(h===cur?' stroke="var(--fg)" stroke-width="1.5"':'')+' data-tip="'+esc('Empezar a las '+hh2(h)+'\n'+eur(c)+' al mes')+'"/>';
+    if(h%3===0)s+='<text class="svt" x="'+(x+w/2).toFixed(1)+'" y="'+(H-7)+'" text-anchor="middle">'+h+'</text>';
+  });
+  return s+'</svg>';
+}
+function stripChart(sim,startH){
+  var W=340,H=110,l=6,r=6,pw=W-l-r,bw=pw/24,maxE=Math.max.apply(null,sim.hours.concat([0.01]));
+  var cols={valle:'var(--seq1)',llano:'var(--seq2)',punta:'var(--seq3)'},nm={valle:'Valle',llano:'Llano',punta:'Punta'};
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Tramos de la tarifa y horas de carga de un día laborable">';
+  var baseY=62,hMax=44;
+  for(var h=0;h<24;h++){
+    var x=l+h*bw,per=periodOf(1,h),e=sim.hours[h];
+    if(e>0){var hh=Math.max(3,e/maxE*hMax);s+='<rect x="'+(x+bw*0.18).toFixed(1)+'" y="'+(baseY-4-hh).toFixed(1)+'" width="'+(bw*0.64).toFixed(1)+'" height="'+hh.toFixed(1)+'" rx="2" fill="var(--accent)" data-tip="'+esc(hh2(h)+'\nCargas '+nf(e,1)+' kWh')+'"/>'}
+    s+='<rect x="'+(x+0.5).toFixed(1)+'" y="'+baseY+'" width="'+(bw-1).toFixed(1)+'" height="22" fill="'+cols[per]+'" stroke="var(--line)" stroke-width=".6" data-tip="'+esc(hh2(h)+'\n'+nm[per]+' (laborables)')+'"/>';
+    if(h%3===0)s+='<text class="svt" x="'+(x+bw/2).toFixed(1)+'" y="'+(baseY+36)+'" text-anchor="middle">'+h+'</text>';
+  }
+  return s+'<text class="svt" x="'+l+'" y="10">kWh por hora de tu carga</text></svg>';
+}
+
+/* ---------- INICIO ---------- */
+var NEED={km:80,T:15,mode:'1',soc:null};
+function needHTML(){
+  if(NEED.soc===null)NEED.soc=S.soc;
+  var cap=capNow(),e=NEED.km*S.car.cons*fTemp(NEED.T)*parseFloat(NEED.mode)/100;
+  var needPct=e/cap*100,reserve=15,target=Math.ceil(needPct+reserve);
+  if(NEED.km<=0)return '<p class="muted">Indica los kilómetros de mañana.</p>';
+  if(target>100)return '<div class="note warn">Con una sola carga no llegas ('+nf(needPct,0)+' % de batería solo para el trayecto). Planifica una parada de carga.</div>';
+  if(target<=NEED.soc)return '<div class="big">No hace falta cargar</div><p class="muted">Gastarás un '+nf(needPct,0)+' % y llegarás con más del '+reserve+' % de reserva.</p>';
+  var kwhBat=cap*(target-NEED.soc)/100,kwhWall=kwhBat/S.eff.casa;
+  var h=kwhWall/Math.max(0.5,S.routine.kw),cost=kwhWall*S.price.casa;
+  return '<div class="big">Carga hasta el '+target+'<small>%</small></div><p class="muted">El trayecto gasta un '+nf(needPct,0)+' % y te quedas con '+reserve+' % de reserva.'+(target>80?' Es mucho para cada día: si puedes, termina de cargar justo antes de salir.':'')+'</p>'
+   +'<div class="grid3">'+kv(nf(kwhWall,1)+' kWh','Del enchufe')+kv(fmtH(h),'En casa a '+nf(S.routine.kw,1)+' kW')+kv(eur(cost),'Coste con tu precio')+'</div>';
+}
+function viewInicio(){
+  var h=sohSummary(),m=monthTotals(monthKey(iso(new Date()))),c=consStats(),rk=planRanking(S.routine.start);
+  var v=h.val!==null?verdict(h.val):null;
+  var html='<section class="card" id="heroCard"><div class="head"><h2>'+esc(S.car.name)+'</h2><span class="tag">'+nf(S.car.nominal)+' kWh útiles</span></div>'
+   +gaugeSVG(h.val)
+   +'<div class="head"><div><div class="big">'+(h.val!==null?nf(h.val,0)+'<small>% de salud</small>':'<small>Sin datos todavía</small>')+'</div><div class="muted small">'+(h.val!==null?(h.basis==='calc'?'Estimada con '+h.used+' cargas':'Según tu última lectura'):'Registra cargas de al menos 30 puntos de batería')+'</div></div>'+(v?'<span class="pill '+v[0]+'">'+v[1]+'</span>':'')+'</div>'
+   +'<button class="btn ghost" type="button" data-go="bateria">Ver detalle de la batería</button></section>'
+   +nowTramoHTML()
+   +'<section class="card"><h3>¿Cuánto cargo para mañana?</h3>'
+   +'<div class="grid2">'+fld('nKm','Kilómetros',NEED.km,{unit:'km',min:0})+fld('nT','Temperatura',NEED.T,{unit:'°C'})+'</div>'
+   +'<div class="grid2"><label class="f" for="nMode">Tipo de trayecto<select id="nMode">'+[['0.85','Ciudad'],['1','Mixto'],['1.2','Autovía']].map(function(o){return '<option value="'+o[0]+'"'+(NEED.mode===o[0]?' selected':'')+'>'+o[1]+'</option>'}).join('')+'</select></label>'
+   +'<label class="f" for="nSoc">Batería ahora: <b id="nSocV">'+NEED.soc+' %</b><input id="nSoc" type="range" min="1" max="100" value="'+NEED.soc+'"></label></div>'
+   +'<div id="needOut" style="display:flex;flex-direction:column;gap:10px">'+needHTML()+'</div></section>'
+   +'<section class="card"><div class="head"><h3>Este mes</h3><span class="muted small">'+m.n+' cargas</span></div><div class="grid2">'+kv(nf(m.kwh,0)+' kWh','Energía cargada')+kv(eur(m.cost),'Gasto en carga')+kv(c.km?nf(c.cons,1)+' kWh/100 km':'—','Consumo en el enchufe')+kv(c.km?eur(Math.max(0,c.save),0):'—','Ahorro frente a gasolina')+'</div>'
+   +(c.km?'<p class="muted small">Calculado con los kilómetros entre cargas que has registrado ('+nf(c.km)+' km).</p>':'<p class="muted small">Apunta el odómetro en tus cargas para ver consumo y ahorro.</p>')+'</section>';
+  if(rk.rows.length){
+    var worst=rk.rows[rk.rows.length-1];
+    html+='<section class="card"><div class="head"><h3>Tu tarifa más barata</h3><span class="tag">según tu rutina</span></div><p><b>'+esc(rk.rows[0].p.n)+'</b>: unos <b class="num">'+eur(rk.rows[0].cost)+'</b> al mes cargando en casa'+(rk.rows.length>1?', hasta '+eur((worst.cost-rk.rows[0].cost)*12,0)+' al año menos que '+esc(worst.p.n)+'.':'.')+'</p><button class="btn ghost" type="button" data-go="tarifas">Ajustar mi rutina y comparar</button></section>';
+  }
+  if(h.age===null||h.age>60)html+='<section class="card plain"><p class="small muted">'+(h.age===null?'Todavía no hay datos para estimar la salud de la batería.':'Hace '+h.age+' días de tu última estimación.')+' Una carga larga (del 20 % al 80 %, por ejemplo) con los kWh anotados basta para actualizarla.</p></section>';
+  if(S.log.some(function(l){return l.ex})||S.reads.some(function(r){return r.ex}))html+='<section class="card plain"><p class="small muted">Las cargas y lecturas con la palabra «ejemplo» son datos de muestra: sustitúyelos por los tuyos. Los precios de Tarifas son orientativos (octubre de 2026); compruébalos antes de decidir.</p></section>';
+  return {html:html,bind:function(){
+    $$('[data-go]').forEach(function(b){b.addEventListener('click',function(){go(b.dataset.go)})});
+    var up=function(){NEED.km=Math.max(0,num($('#nKm').value,0));NEED.T=num($('#nT').value,15);NEED.mode=$('#nMode').value;NEED.soc=num($('#nSoc').value,50);$('#nSocV').textContent=NEED.soc+' %';$('#needOut').innerHTML=needHTML()};
+    ['nKm','nT','nMode','nSoc'].forEach(function(id){$('#'+id).addEventListener('input',up)});
+  }};
+}
+
+/* ---------- BATERÍA ---------- */
+function reportText(){
+  var h=sohSummary(),hb=habits(),pts=h.pts;
+  var first=pts.length?pts[0].date:null,last=pts.length?pts[pts.length-1].date:null;
+  var lines=['Informe de batería · '+S.car.name,'Fecha: '+dmy(iso(new Date())),'',
+   'Capacidad útil de fábrica (dato introducido): '+nf(S.car.nominal,1)+' kWh'];
+  if(h.val!==null){
+    lines.push('Salud estimada: '+nf(h.val,0)+' % ('+nf(h.cap,1)+' kWh útiles)');
+    lines.push('Base: '+(h.basis==='calc'?h.used+' cargas con diferencia de batería de 30 puntos o más (rango '+nf(h.lo,0)+'–'+nf(h.hi,0)+' %)':'lectura manual'));
+  }else lines.push('Salud estimada: sin datos suficientes');
+  if(h.man)lines.push('Última lectura manual: '+nf(h.man.soh,0)+' % ('+dmy(h.man.date)+')');
+  if(first)lines.push('Periodo de datos: '+dmy(first)+' a '+dmy(last));
+  lines.push('Cargas registradas: '+S.log.length+(hb.n?' · últimos 90 días: '+nf(hb.dcShare,0)+' % de la energía en carga rápida':''));
+  lines.push('','Estimación orientativa calculada con los kWh anotados por el propietario y el porcentaje de batería que muestra el coche. No es un diagnóstico oficial ni sustituye a una prueba del fabricante.');
+  return lines.join('\n');
+}
+function reportHTML(){
+  var t=reportText().split('\n');
+  return '<!doctype html><html lang="es"><meta charset="utf-8"><title>Informe de batería</title><body style="font-family:system-ui,sans-serif;max-width:640px;margin:24px auto;padding:0 16px;line-height:1.5;color:#0c1b1a"><h1 style="font-size:1.4rem">'+esc(t[0])+'</h1>'+t.slice(1).map(function(x){return x?'<p>'+esc(x)+'</p>':''}).join('')+'</body></html>';
+}
+function csvText(){
+  var rows=[['fecha','tipo','lugar','bateria_inicio','bateria_fin','kwh','importe_eur','odometro_km']];
+  S.log.slice().sort(function(a,b){return a.date<b.date?-1:1}).forEach(function(l){rows.push([l.date,l.type,l.place||'',l.from,l.to,l.kwh,l.cost,l.odo||''])});
+  return rows.map(function(r){return r.map(function(c){c=String(c);return /[",;\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(';')}).join('\n');
+}
+function saveFile(filename,data,fallbackText){
+  if(!(window.claude&&window.claude.use)){
+    try{var bl=new Blob([data],{type:'text/plain;charset=utf-8'}),u=URL.createObjectURL(bl),a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);if(a.parentNode)a.parentNode.removeChild(a)},500);toast('Archivo descargado');return}catch(e){}
+    copyText(fallbackText||data);return}
+  window.claude.use('downloads').then(function(d){
+    if(!d){copyText(fallbackText||data);return}
+    return d.save({filename:filename,data:data}).then(function(){toast('Archivo guardado')},function(e){if(!e||e.code!=='declined')toast('No se pudo guardar el archivo');});
+  });
+}
+function copyText(txt){
+  try{navigator.clipboard.writeText(txt).then(function(){toast('Copiado al portapapeles')},function(){toast('No se pudo copiar')})}catch(e){toast('No se pudo copiar')}
+}
+function viewBateria(){
+  var h=sohSummary(),tr=trend(h.pts),hb=habits();
+  var v=h.val!==null?verdict(h.val):null;
+  var html='<section class="card"><h2>Salud de la batería</h2>'+gaugeSVG(h.val)
+   +(h.val!==null?'<div class="head"><div><div class="big">'+nf(h.val,0)+'<small>%</small></div><div class="muted small">'+nf(h.cap,1)+' kWh útiles de '+nf(S.car.nominal,1)+'</div></div><span class="pill '+v[0]+'">'+v[1]+'</span></div>'
+     +'<div class="grid2">'+kv(h.basis==='calc'?nf(h.lo,0)+'–'+nf(h.hi,0)+' %':'—','Rango de tus estimaciones')+kv(h.man?nf(h.man.soh,0)+' %':'—','Última lectura manual'+(h.man?' · '+dmy(h.man.date):''))+'</div>'
+     +'<p class="muted small">'+(h.basis==='calc'?'Mediana de tus últimas '+h.used+' cargas largas.':'Aún no hay cargas largas suficientes; uso tu lectura manual.')+' Es una estimación con un margen de varios puntos.</p>'
+     :'<div class="note">Todavía no hay datos. Registra una carga larga (30 puntos de batería o más) con los kWh que marca tu cargador o contador, o apunta abajo una lectura de la app del coche.</div>')
+   +'</section>';
+  html+='<section class="card"><div class="head"><h3>Evolución</h3><span class="muted small">'+h.pts.length+' puntos</span></div>'+sohChart(h.pts,tr)
+   +'<div class="legend"><span><i class="circ" style="background:var(--accent)"></i>Estimada con una carga</span><span><i class="dia" style="background:var(--s2)"></i>Lectura manual</span>'+(tr?'<span><i style="background:transparent;border-top:2px dashed var(--accent);height:0;border-radius:0"></i>Tendencia</span>':'')+'</div>';
+  if(tr){
+    var py=tr.perYear,cur=h.val!==null?h.val:null,txt;
+    if(py>-0.3)txt='No se aprecia pérdida con los datos actuales.';
+    else{txt='Tendencia orientativa: '+nf(Math.abs(py),1)+' puntos menos al año.';if(cur!==null&&cur>80){var yrs=(cur-80)/Math.abs(py);if(yrs<=30)txt+=' Con ese ritmo bajarías del 80 % en unos '+nf(yrs,0)+' años.'}}
+    html+='<p>'+txt+'</p>';
+  }else if(h.pts.length)html+='<p class="muted small">La tendencia aparece con 4 o más puntos repartidos en al menos 3 meses.</p>';
+  html+='<details class="tbl"><summary>Ver tabla de datos</summary><div class="tblwrap"><table><thead><tr><th>Fecha</th><th>Salud</th><th>Origen</th></tr></thead><tbody>'
+   +h.pts.slice().reverse().map(function(p){return '<tr><td>'+dmy(p.date)+'</td><td>'+nf(p.soh,1)+' %</td><td>'+(p.src==='calc'?'Carga':'Manual')+(p.ex?' (ejemplo)':'')+'</td></tr>'}).join('')+'</tbody></table></div></details></section>';
+  html+='<section class="card"><h3>Apuntar lectura de salud</h3><p class="muted small">Algunos coches y apps de diagnóstico muestran el estado de salud (SoH). Si lo ves, anótalo.</p><form id="rdForm" class="grid2">'
+   +fld('rdDate','Fecha',iso(new Date()),{type:'date'})+fld('rdPct','Salud',93,{unit:'%',min:40,max:110})
+   +'<button class="btn" type="submit" style="grid-column:1/-1">Guardar lectura</button></form>'
+   +(S.reads.length?'<div>'+S.reads.slice().sort(function(a,b){return a.date<b.date?1:-1}).map(function(r){return '<div class="rowl"><div class="t"><b class="num">'+dmy(r.date)+' · '+nf(r.pct,0)+' %</b>'+(r.ex?'<span class="muted small">Ejemplo</span>':'')+'</div><button type="button" class="x" data-rmr="'+esc(r.id)+'" aria-label="Borrar lectura">×</button></div>'}).join('')+'</div>':'')+'</section>';
+  var tips=[];
+  if(hb.n){
+    if(hb.dcShare>30)tips.push('Más del '+nf(hb.dcShare,0)+' % de tu energía reciente viene de carga rápida. Suele convenir reservarla para viajes y cargar en casa a diario.');
+    if(hb.full>=3)tips.push('Has cargado al 100 % '+hb.full+' veces en los últimos 30 días. Para el día a día suele ser mejor quedarse cerca del 80 %.');
+    if(hb.low>=2)tips.push('Has llegado a cargar con menos del 8 % de batería en '+hb.low+' ocasiones. Evitar descargas muy profundas ayuda.');
+  }
+  if(!tips.length)tips.push(hb.n?'Tus hábitos de carga de los últimos 90 días son cuidadosos. Sigue así.':'Cuando registres cargas, aquí verás consejos según tus hábitos.');
+  html+='<section class="card"><div class="head"><h3>Tus hábitos de carga</h3><span class="muted small">últimos 90 días</span></div>'
+   +(hb.n?'<div class="grid3">'+kv(nf(hb.dcShare,0)+' %','En carga rápida')+kv(nf(hb.avgTo,0)+' %','Carga final media')+kv(String(hb.full),'Al 100 % (30 d)')+'</div>':'')
+   +tips.map(function(t){return '<div class="note">'+t+'</div>'}).join('')+'</section>';
+  html+='<section class="card"><h3>Cómo cuidar la batería</h3><div class="note">Para el día a día, mantenerla entre el 20 y el 80 % suele ser lo mejor. Cárgala al 100 % solo antes de un viaje largo.</div><div class="note">La carga rápida en continua calienta más la batería. Úsala en viaje y carga en casa a diario.</div><div class="note">Evita dejar el coche días con la batería casi llena o casi vacía, y no lo expongas al calor extremo.</div><div class="note">Si tu coche tiene batería LFP, los fabricantes suelen recomendar cargarla al 100 % con regularidad. Mira el manual de tu modelo.</div><p class="muted small">Consejos generales: manda siempre la recomendación del fabricante de tu coche.</p></section>';
+  html+='<section class="card"><h3>Informe para vender o enseñar</h3><p class="muted small">Resumen con la salud estimada, el periodo de datos y tus hábitos de carga.</p><div class="grid2"><button class="btn ghost" id="rpCopy" type="button">Copiar resumen</button><button class="btn ghost" id="rpSave" type="button">Guardar informe</button></div></section>';
+  html+='<section class="card plain"><h3>Cómo se calcula</h3><p class="small muted">Con cada carga de 30 puntos de batería o más, divido la energía que entró en la batería entre el porcentaje cargado. La energía sale de los kWh anotados menos las pérdidas de carga que fijas en Ajustes. Se compara con la capacidad útil de fábrica. El porcentaje de batería del coche no es exacto, por eso conviene mirar la tendencia y no una sola carga. Muchos fabricantes garantizan alrededor del 70 % durante varios años: comprueba las condiciones de tu contrato.</p></section>';
+  return {html:html,bind:function(){
+    $('#rdForm').addEventListener('submit',function(e){
+      e.preventDefault();var pct=num($('#rdPct').value,0);
+      if(pct<40||pct>110){toast('Indica un porcentaje entre 40 y 110');return}
+      S.reads.push({id:uid(),date:$('#rdDate').value||iso(new Date()),pct:pct});save();render();toast('Lectura guardada');
+    });
+    $$('[data-rmr]').forEach(function(b){b.addEventListener('click',function(){S.reads=S.reads.filter(function(r){return r.id!==b.dataset.rmr});save();render()})});
+    $('#rpCopy').addEventListener('click',function(){copyText(reportText())});
+    $('#rpSave').addEventListener('click',function(){saveFile('informe-bateria.html',reportHTML(),reportText())});
+  }};
+}
+
+/* ---------- CARGAS ---------- */
+var CF={type:'casa'};
+var TYPES={casa:'Casa',ac:'Pública lenta',dc:'Pública rápida'};
+function viewCargas(){
+  var ms=monthSeries(),c=consStats(),sorted=S.log.slice().sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0)});
+  var tot=S.log.reduce(function(a,l){return a+l.cost},0),totK=S.log.reduce(function(a,l){return a+l.kwh},0);
+  var html='<section class="card"><div class="head"><h2>Registro de cargas</h2><span class="muted small">'+S.log.length+' cargas</span></div><div class="grid2">'
+   +kv(eur(tot),'Gasto total')+kv(nf(totK,0)+' kWh','Energía total')+kv(totK?eur(tot/totK,3):'—','Precio medio por kWh')+kv(c.km?eur(c.per100)+'':'—','Coste cada 100 km')+'</div></section>'
+   +'<section class="card"><div class="head"><h3>Gasto por mes</h3><span class="muted small">últimos 6 meses</span></div>'+monthChart(ms)
+   +'<div class="legend"><span><i style="background:var(--s1)"></i>Casa</span><span><i style="background:var(--s2)"></i>Pública lenta</span><span><i style="background:var(--s3)"></i>Pública rápida</span></div>'
+   +'<details class="tbl"><summary>Ver tabla de datos</summary><div class="tblwrap"><table><thead><tr><th>Mes</th><th>Casa</th><th>Lenta</th><th>Rápida</th><th>Total</th></tr></thead><tbody>'
+   +ms.map(function(m){return '<tr><td>'+esc(m.label)+'</td><td>'+eur(m.casa)+'</td><td>'+eur(m.ac)+'</td><td>'+eur(m.dc)+'</td><td>'+eur(m.total)+'</td></tr>'}).join('')+'</tbody></table></div></details></section>'
+   +'<section class="card"><h3>Qué te sale más barato</h3>'+typeCostsHTML()+'</section>'
+   +'<section class="card"><h3>Resumen del año</h3>'+yearHTML()+'</section>'
+   +'<section class="card"><h3>Añadir carga</h3><form id="lgForm" style="display:flex;flex-direction:column;gap:10px">'
+   +seg([['casa','Casa'],['ac','Pública lenta'],['dc','Pública rápida']],CF.type,'cfType')
+   +'<div class="grid2">'+fld('cDate','Fecha',iso(new Date()),{type:'date'})+fld('cPlace','Lugar u operador','',{type:'text'})
+   +fld('cFrom','Batería al empezar',20,{unit:'%',min:0,max:100})+fld('cTo','Batería al acabar',80,{unit:'%',min:1,max:100})
+   +fld('cKwh','Energía',30,{unit:'kWh',min:0})+fld('cCost','Importe',3.3,{unit:'€',min:0})+'</div>'
+   +fld('cOdo','Odómetro (opcional)','',{unit:'km',min:0})
+   +'<p class="muted small" id="cHint"></p><button class="btn" type="submit">Guardar carga</button></form></section>'
+   +'<section class="card"><div class="head"><h3>Historial</h3>'+(S.log.some(function(l){return l.ex})?'<button class="btn ghost sm" id="clearEx" type="button">Quitar ejemplos</button>':'')+'</div>'
+   +(sorted.length?sorted.map(function(l){
+      var d=l.to-l.from;
+      return '<div class="rowl"><div class="t"><b class="num">'+dmy(l.date)+' · '+nf(l.kwh,1)+' kWh · '+eur(l.cost)+'</b><span class="muted small">'+TYPES[l.type]+(l.place?' · '+esc(l.place):'')+' · '+l.from+' → '+l.to+' %'+(l.odo?' · '+nf(l.odo)+' km':'')+(l.ex?' · ejemplo':'')+(d>=30?'':' · no sirve para la salud')+'</span></div><button type="button" class="x" data-rm="'+esc(l.id)+'" aria-label="Borrar carga">×</button></div>';
+    }).join(''):'<p class="muted">Todavía no hay cargas. Guarda la primera con el formulario de arriba.</p>')+'</section>';
+  return {html:html,bind:function(){
+    onSeg($('#cfType'),function(v){CF.type=v;render()});
+    var hint=function(){
+      var k=num($('#cKwh').value),c=num($('#cCost').value),f=num($('#cFrom').value),t=num($('#cTo').value);
+      var h=$('#cHint');if(!h)return;
+      var parts=[];
+      if(k>0&&c>0)parts.push('Precio: '+eur(c/k,3)+' por kWh.');
+      parts.push((t-f)>=30?'Esta carga sirve para estimar la salud de la batería.':'Con menos de 30 puntos de diferencia no se usa para estimar la salud.');
+      h.textContent=parts.join(' ');
+    };
+    ['cKwh','cCost','cFrom','cTo'].forEach(function(id){$('#'+id).addEventListener('input',hint)});hint();
+    $('#lgForm').addEventListener('submit',function(e){
+      e.preventDefault();
+      var kwh=num($('#cKwh').value),cost=num($('#cCost').value),f=num($('#cFrom').value),t=num($('#cTo').value),odo=num($('#cOdo').value);
+      if(kwh<=0){toast('Indica la energía cargada');return}
+      if(!(t>f)){toast('La batería final debe ser mayor que la inicial');return}
+      S.log.push({id:uid(),date:$('#cDate').value||iso(new Date()),type:CF.type,place:$('#cPlace').value.trim(),from:f,to:t,kwh:kwh,cost:cost,odo:odo>0?odo:0});
+      save();render();toast('Carga guardada');
+    });
+    $$('[data-rm]').forEach(function(b){b.addEventListener('click',function(){S.log=S.log.filter(function(l){return l.id!==b.dataset.rm});save();render()})});
+    var ce=$('#clearEx');if(ce)ce.addEventListener('click',function(){S.log=S.log.filter(function(l){return !l.ex});S.reads=S.reads.filter(function(r){return !r.ex});save();render();toast('Ejemplos quitados')});
+  }};
+}
+
+/* ---------- TARIFAS ---------- */
+var T={tab:'luz'};
+var DAYS=[[1,'L'],[2,'M'],[3,'X'],[4,'J'],[5,'V'],[6,'S'],[0,'D']];
+function rankingHTML(){
+  var rk=planRanking(S.routine.start),rows=rk.rows;
+  if(!rows.length)return '<p class="muted">Añade al menos un plan para compararlo.</p>';
+  var max=Math.max.apply(null,rows.map(function(r){return r.cost}).concat([1]));
+  var best=rows[0],bs=bestStart(best.p),cur=best.cost;
+  var out='<div class="bars">'+rows.map(function(r,i){
+    return '<div class="barrow'+(i===0?' best':'')+'"><span>'+esc(r.p.n)+(i===0?' <span class="pill ok">Más barato</span>':'')+'</span><b class="num">'+eur(r.cost)+'/mes</b><div class="trk"><i style="width:'+(r.cost/max*100).toFixed(1)+'%"></i></div></div>';
+  }).join('')+'</div>';
+  if(rows.length>1)out+='<p>Ahorro de «'+esc(best.p.n)+'» frente a «'+esc(rows[rows.length-1].p.n)+'»: <b class="num">'+eur((rows[rows.length-1].cost-best.cost)*12,0)+' al año</b>.</p>';
+  if(bs&&cur-bs.cost>0.05)out+='<div class="note ok">Empezando a cargar a las <b>'+hh2(bs.h)+'</b> en vez de a las '+hh2(S.routine.start)+' pagarías '+eur(bs.cost)+' al mes: <b>'+eur((cur-bs.cost)*12,0)+' menos al año</b> con «'+esc(best.p.n)+'».</div>';
+  else out+='<div class="note">Tu hora de inicio ya es de las más baratas para «'+esc(best.p.n)+'».</div>';
+  var sim=rk.sim,tot=sim.e.punta+sim.e.llano+sim.e.valle;
+  out+='<div class="grid3">'+kv(nf(tot,0)+' kWh','Al mes en casa')+kv(tot?nf(sim.e.valle/tot*100,0)+' %':'—','En valle')+kv(tot?nf(sim.e.punta/tot*100,0)+' %':'—','En punta')+'</div>';
+  out+='<div><h3 style="margin-bottom:6px">Coste según la hora de inicio</h3>'+startChart(best.p,S.routine.start)+'<p class="muted small">Plan «'+esc(best.p.n)+'». La barra marcada con borde es tu hora actual.</p></div>';
+  return out;
+}
+function stripHTML(){
+  var sim=simRoutine(S.routine,S.routine.start);
+  return stripChart(sim,S.routine.start)+'<div class="legend"><span><i style="background:var(--seq1);border:1px solid var(--line)"></i>Valle</span><span><i style="background:var(--seq2)"></i>Llano</span><span><i style="background:var(--seq3)"></i>Punta</span><span><i style="background:var(--accent)"></i>Tu carga</span></div><p class="muted small">Laborables en tramos 2.0TD: valle de 0 a 8 h, llano de 8 a 10, 14 a 18 y 22 a 24, punta de 10 a 14 y 18 a 22. Sábados, domingos y festivos nacionales todo es valle.</p>';
+}
+function pubOutHTML(){
+  var rows=S.pub.map(function(p){return {p:p,cost:pubCost(p,S.pubKwh),unit:pubUnit(p)}}).sort(function(a,b){return a.cost-b.cost});
+  if(!rows.length)return '<p class="muted">Añade al menos un plan.</p>';
+  var max=Math.max.apply(null,rows.map(function(r){return r.cost}).concat([1]));
+  var out='<div class="bars">'+rows.map(function(r,i){
+    return '<div class="barrow'+(i===0?' best':'')+'"><span>'+esc(r.p.n)+(i===0?' <span class="pill ok">Más barato</span>':'')+'</span><b class="num">'+eur(r.cost)+'/mes</b><div class="trk"><i style="width:'+(r.cost/max*100).toFixed(1)+'%"></i></div><span class="muted small" style="grid-column:1/-1">'+(S.pubKwh>0?eur(r.cost/S.pubKwh,3)+' por kWh de media':'')+'</span></div>';
+  }).join('')+'</div>';
+  var base=S.pub.slice().sort(function(a,b){return a.fee-b.fee})[0];
+  var lines=[];
+  S.pub.forEach(function(p){
+    if(p===base||p.fee<=base.fee)return;
+    var d=pubUnit(base)-pubUnit(p);
+    lines.push(d>0?'«'+esc(p.n)+'» compensa frente a «'+esc(base.n)+'» a partir de <b>'+nf((p.fee-base.fee)/d,0)+' kWh al mes</b>.':'«'+esc(p.n)+'» no compensa frente a «'+esc(base.n)+'»: su precio por kWh no es menor.');
+  });
+  if(lines.length)out+='<div class="note">'+lines.join('<br>')+'</div>';
+  return out;
+}
+
+/* ---------- GRATIS ---------- */
+var FREE_DATE='oct. 2026';
+var FREE=[
+ {n:'IKEA',t:'ok',d:'Cargadores en la mayoría de tiendas. Gratis unas 2 horas si te registras en IKEA Family; después, tarifa normal (en torno a 0,49 €/kWh). Algunas tiendas tienen rápida.'},
+ {n:'Lidl',t:'ok',d:'Muchas tiendas, hasta 22 kW, gratis mientras compras y con límite de unos 30 minutos. No en todas: mira el cartel y la app. Algunos puntos fallan.'},
+ {n:'Carrefour',t:'mix',d:'Depende del centro: en algunos, la primera hora es gratis; en otros se paga (lenta 0,42–0,55 €/kWh, rápida 0,55–0,69). Se paga con la app de Carrefour, Iberdrola o tarjeta.'},
+ {n:'El Corte Inglés',t:'mix',d:'En algunos centros, primera media hora gratis con la tarjeta del centro; en otros, tarifa normal.'},
+ {n:'Ahorramás',t:'one',d:'Gratis para clientes, sobre todo en Madrid. Solo lo recoge una fuente.'},
+ {n:'McDonald\'s, Burger King, Starbucks',t:'one',d:'Algunos locales, para clientes. Cambia mucho de un local a otro.'},
+ {n:'Hoteles',t:'mix',d:'Muchos ofrecen carga gratis a huéspedes. Suele haber que avisar en recepción antes de enchufar.'},
+ {n:'Aeropuertos y estaciones',t:'mix',d:'Madrid-Barajas T2, Valencia, Bilbao, Palma, Barcelona-El Prat… Normalmente la carga es gratis, pero pagas el aparcamiento.'},
+ {n:'Edificios públicos y universidades',t:'one',d:'Ayuntamientos, juzgados, bibliotecas y campus (para alumnos y personal). Depende de cada municipio.'},
+ {n:'Parkings municipales',t:'one',d:'Madrid, Barcelona y Valencia han puesto algunos puntos gratuitos. Sin lista fiable de ubicaciones.'},
+ {n:'Mercadona',t:'bad',d:'Las fuentes se contradicen: una dice que no tiene cargadores (mayo de 2026) y otras hablan de 1.500 puntos de hasta 7,4 kW. No cuentes con ello sin verlo.'},
+ {n:'Decathlon, Leroy Merlin, Costco',t:'paid',d:'Tienen cargadores, pero de pago.'}
+];
+var FREE_T={ok:['Varias fuentes coinciden','ok'],mix:['Depende del sitio',''],one:['Solo una fuente',''],bad:['Fuentes contradictorias','warn'],paid:['De pago','']};
+function freeSaved(){
+  var k=0,v=0;
+  S.log.forEach(function(l){if(l.type!=='casa'&&l.cost===0&&l.kwh>0){k+=l.kwh;v+=l.kwh*(l.type==='dc'?S.price.dc:S.price.ac)}});
+  return {kwh:k,eur:v};
+}
+function gratisView(){
+  var fs=freeSaved(),mq='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent('cargadores gratuitos coche eléctrico');
+  var html='<section class="card"><h3>Guía de sitios que suelen ser gratis</h3><p class="muted small">Orientativa, de '+FREE_DATE+', sacada de varias guías. Las condiciones cambian: comprueba siempre el cartel o la app del sitio.</p>'
+   +(fs.kwh>0?'<div class="note ok">Has cargado <b>'+nf(fs.kwh,0)+' kWh gratis</b> fuera de casa, el equivalente a unos <b>'+eur(fs.eur,0)+'</b> con tus precios habituales.</div>':'<p class="muted small">Cuando registres una carga pública con coste 0, aquí verás lo que llevas ahorrado.</p>')+'</section>'
+   +'<section class="card"><h3>Otros mapas</h3><p class="muted small">Permiten filtrar por precio o buscar puntos gratuitos. Se abren fuera de la app.</p><div class="grid2">'
+   +'<a class="btn ghost sm" href="https://www.electromaps.com/" target="_blank" rel="noopener">Electromaps</a>'
+   +'<a class="btn ghost sm" href="https://www.plugshare.com/" target="_blank" rel="noopener">PlugShare</a>'
+   +'<a class="btn ghost sm" href="https://map.openchargemap.io/" target="_blank" rel="noopener">Open Charge Map</a>'
+   +'<a class="btn ghost sm" href="'+mq+'" target="_blank" rel="noopener">Google Maps</a></div></section>'
+   +'<section class="card"><h3>Qué suele ser gratis</h3>'
+   +FREE.map(function(f){var t=FREE_T[f.t];return '<div class="rowl" style="align-items:flex-start"><div class="t"><b>'+esc(f.n)+'</b><span class="muted small">'+esc(f.d)+'</span></div><span class="tag"'+'>'+t[0]+'</span></div>'}).join('')+'</section>'
+   +'<section class="card"><h3>Mis sitios gratis</h3><p class="muted small">Apunta los que compruebes tú. Es la lista más fiable que tendrás.</p>'
+   +(S.spots.length?S.spots.map(function(p){return '<div class="rowl"><div class="t"><b>'+esc(p.n)+'</b><span class="muted small">'+(p.w?esc(p.w)+' · ':'')+(p.c?esc(p.c)+' · ':'')+'comprobado '+dmy(p.date)+(p.la?' · <a class="link" href="https://www.google.com/maps/dir/?api=1&destination='+p.la+','+p.lo+'" target="_blank" rel="noopener">cómo llegar</a>':'')+'</span></div><span style="display:flex;gap:6px"><button type="button" class="btn ghost sm" data-chk="'+esc(p.id)+'">Comprobado hoy</button><button type="button" class="x" data-rms="'+esc(p.id)+'" aria-label="Borrar sitio">×</button></span></div>'}).join(''):'<p class="muted small">Todavía no has añadido ninguno.</p>')
+   +fld('sN','Nombre',"",{type:'text',data:'placeholder="Lidl de mi barrio"'})+fld('sW','Dónde (ciudad o dirección)',"",{type:'text'})+fld('sC','Condiciones (límite, solo clientes…)',"",{type:'text'})
+   +'<button class="btn" id="addSpot" type="button">Añadir sitio</button></section>';
+  return {html:html,bind:function(){
+    $('#addSpot').addEventListener('click',function(){var n=$('#sN').value.trim();if(!n){toast('Escribe un nombre');return}S.spots.unshift({id:uid(),n:n,w:$('#sW').value.trim(),c:$('#sC').value.trim(),date:iso(new Date())});save();render()});
+    $$('[data-rms]').forEach(function(b){b.addEventListener('click',function(){S.spots=S.spots.filter(function(x){return x.id!==b.dataset.rms});save();render()})});
+    $$('[data-chk]').forEach(function(b){b.addEventListener('click',function(){S.spots.forEach(function(x){if(x.id===b.dataset.chk)x.date=iso(new Date())});save();render()})});
+  }};
+}
+
+/* ---------- VIAJE ---------- */
+var SPEEDF={90:0.88,100:0.94,110:1,120:1.1,130:1.22};
+function tripCalc(){
+  var t=S.trip,cap=capNow(),cons=S.car.cons*(SPEEDF[t.speed]||1)*fTemp(t.temp)/fTemp(15);
+  var need=t.km*cons/100,avail=cap*Math.max(0,t.soc-t.arr)/100,toCharge=Math.max(0,need-avail);
+  var perStop=Math.max(1,cap*0.6),stops=toCharge>0?Math.ceil(toCharge/perStop):0;
+  var kw=Math.max(20,Math.min(S.car.dc,150)*0.65),billed=toCharge/S.eff.dc;
+  var arrive=Math.max(0,t.soc-need/cap*100+(toCharge/cap*100));
+  return {need:need,cons:cons,toCharge:toCharge,stops:stops,mins:toCharge/kw*60+stops*5,cost:billed*S.price.dc,home:need/S.eff.casa*S.price.casa,gas:t.km*S.gas.l100/100*S.gas.price,arrive:arrive,cap:cap};
+}
+function tripOutHTML(){
+  var r=tripCalc(),t=S.trip,h='';
+  h+='<div class="grid2"><div class="stat"><span class="muted small">Energía del viaje</span><b class="num">'+nf(r.need,0)+' kWh</b></div><div class="stat"><span class="muted small">Consumo previsto</span><b class="num">'+nf(r.cons,1)+' kWh/100 km</b></div>'
+   +'<div class="stat"><span class="muted small">Paradas a cargar</span><b class="num">'+r.stops+'</b></div><div class="stat"><span class="muted small">Tiempo cargando</span><b class="num">'+(r.toCharge>0?fmtH(r.mins/60):'0 min')+'</b></div></div>';
+  h+='<div class="note">'+(r.toCharge>0?'Necesitas cargar unos <b>'+nf(r.toCharge,0)+' kWh</b> por el camino: cuestan unos <b>'+eur(r.cost)+'</b> con tu precio de carga rápida, frente a <b>'+eur(r.gas)+'</b> en gasolina.':'Llegas sin parar a cargar. Si cargaras todo en casa costaría unos <b>'+eur(r.home)+'</b>, frente a <b>'+eur(r.gas)+'</b> en gasolina.')+'</div>';
+  if(r.need>r.cap*0.9)h+='<div class="note warn">El viaje pide casi toda la batería. Planifica las paradas con antelación.</div>';
+  h+='<p class="muted small">Estimación aproximada: usa la capacidad real que calcula la app, ajusta el consumo por velocidad y temperatura, y supone paradas del 10 al 70 % a unos dos tercios de la potencia máxima de tu coche. No incluye pendientes, viento ni carga con la calefacción a tope.</p>';
+  return h;
+}
+function viajeView(){
+  var t=S.trip;
+  var html='<section class="card"><h3>Calculadora de viaje</h3><div class="grid2">'+fld('vK','Distancia',t.km,{unit:'km',min:1})+fld('vT','Temperatura',t.temp,{unit:'°C'})+fld('vS','Batería al salir',t.soc,{unit:'%',min:10,max:100})+fld('vA','Llegar con al menos',t.arr,{unit:'%',min:0,max:50})
+   +'<label class="f" for="vV">Velocidad media<select id="vV">'+[90,100,110,120,130].map(function(v){return '<option value="'+v+'"'+(t.speed===v?' selected':'')+'>'+v+' km/h</option>'}).join('')+'</select></label></div></section>'
+   +'<section class="card"><h3>Resultado</h3><div id="viOut" style="display:flex;flex-direction:column;gap:12px">'+tripOutHTML()+'</div></section>'+rutaCardHTML();
+  return {html:html,bind:function(){
+    var rd=function(){var t=S.trip;t.km=Math.max(1,num($('#vK').value,1));t.temp=clamp(num($('#vT').value,15),-20,45);t.soc=clamp(num($('#vS').value,90),10,100);t.arr=clamp(num($('#vA').value,10),0,50);t.speed=parseInt($('#vV').value,10)||120;save();$('#viOut').innerHTML=tripOutHTML()};
+    ['vK','vT','vS','vA','vV'].forEach(function(id){$('#'+id).addEventListener('input',rd)});
+    var rg=$('#rtGo');if(rg){$('#rtO').addEventListener('input',function(e){RT.o=e.target.value});$('#rtD').addEventListener('input',function(e){RT.d=e.target.value});rg.addEventListener('click',function(){if(!RT.busy)routeGo()})}
+  }};
+}
+
+/* ---------- MAPA DE CARGADORES GRATIS (solo versión alojada) ---------- */
+var HOSTED=(typeof window.claude==='undefined');
+var G={pts:[],sel:null,all:false,map:null,group:null,tok:0,timer:null,view:{lat:40.4168,lon:-3.7038,z:11},status:'',statusCls:''};
+var OCMKEY='vatio.ocm';
+function getKey(){try{return (localStorage.getItem(OCMKEY)||'').trim()}catch(e){return ''}}
+function setKey(v){try{localStorage.setItem(OCMKEY,String(v||'').trim())}catch(e){}}
+function hav(a,b,c,d){var R=6371,p=Math.PI/180,x=(c-a)*p,y=(d-b)*p;var q=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*p)*Math.cos(c*p)*Math.sin(y/2)*Math.sin(y/2);return 2*R*Math.asin(Math.sqrt(q))}
+function jget(url,ms){
+  var ctl=('AbortController' in window)?new AbortController():null;
+  var to=setTimeout(function(){if(ctl)ctl.abort()},ms||20000);
+  return fetch(url,ctl?{signal:ctl.signal}:{}).then(function(r){clearTimeout(to);if(!r.ok)throw new Error('error '+r.status);return r.json()},function(e){clearTimeout(to);throw e});
+}
+function normOCM(p){
+  if(!p||!p.AddressInfo)return null;
+  var a=p.AddressInfo,kw=0,cs=[];
+  (p.Connections||[]).forEach(function(c){var pw=num(c.PowerKW,0);if(pw>kw)kw=pw;var t=c.ConnectionType&&c.ConnectionType.Title;if(t){t=String(t).replace(/\(.*?\)/g,'').trim().slice(0,18);if(cs.indexOf(t)<0)cs.push(t)}});
+  var cost=String(p.UsageCost||''),st='desconocido';
+  if(p.StatusType){if(p.StatusType.IsOperational===true)st='operativo';else if(p.StatusType.IsOperational===false)st='fuera'}
+  var lat=parseFloat(a.Latitude),lon=parseFloat(a.Longitude);
+  if(!isFinite(lat)||!isFinite(lon)||(lat===0&&lon===0))return null;
+  return {id:'o'+p.ID,n:a.Title||'Punto de carga',lat:lat,lon:lon,kw:kw,conn:cs,cost:cost,
+    free:/\b(free|gratis|gratuito|gratuita|sin coste|sin cargo)\b/i.test(cost)&&!/\b(not free|no gratis|no es gratis)\b/i.test(cost),
+    s:st,addr:[a.AddressLine1,a.Town].filter(Boolean).join(', '),op:(p.OperatorInfo&&p.OperatorInfo.Title)||'',upd:String(p.DateLastVerified||p.DateLastStatusUpdate||'').slice(0,10),np:p.NumberOfPoints||0};
+}
+function gShown(){return G.pts.filter(function(p){return G.all||p.free}).sort(function(a,b){return hav(G.view.lat,G.view.lon,a.lat,a.lon)-hav(G.view.lat,G.view.lon,b.lat,b.lon)})}
+function gStatus(msg,cls){G.status=msg;G.statusCls=cls||'';var el=$('#gstatus');if(el){el.hidden=!msg;el.className='note'+(cls?' '+cls:'');el.textContent=msg}}
+function gLoad(){
+  if(!G.map)return;
+  var key=getKey();
+  if(!key){G.pts=[];gDraw();gStatus('Pega tu clave gratuita de Open Charge Map para ver los cargadores reales.','warn');return}
+  var c=G.map.getCenter(),b=G.map.getBounds();
+  if(G.map.getZoom()<9){gStatus('Acerca el mapa para ver los cargadores de la zona.','');return}
+  var rad=clamp(Math.max(hav(c.lat,c.lng,b.getNorth(),c.lng),hav(c.lat,c.lng,c.lat,b.getEast())),3,60);
+  var tok=++G.tok;gStatus('Buscando cargadores…','ok');
+  var q='?output=json&latitude='+c.lat.toFixed(5)+'&longitude='+c.lng.toFixed(5)+'&distance='+Math.round(rad)+'&distanceunit=KM&maxresults=500&compact=false&verbose=false&countrycode=ES&key='+encodeURIComponent(key);
+  jget('https://api.openchargemap.io/v3/poi'+q,25000).then(function(arr){
+    if(tok!==G.tok)return;
+    if(!Array.isArray(arr))throw new Error('respuesta no válida');
+    G.pts=arr.map(normOCM).filter(Boolean);
+    var f=G.pts.filter(function(p){return p.free}).length;
+    gStatus(f?'':'No hay puntos marcados como gratis en esta zona ('+G.pts.length+' cargadores en total). En Open Charge Map el precio lo rellena la comunidad, así que muchos gratuitos no están marcados.','');
+    gDraw();
+  },function(e){
+    if(tok!==G.tok)return;
+    gStatus('No se pudieron cargar los cargadores ('+(e&&e.message?e.message:'sin conexión')+'). Revisa tu clave y tu conexión.','bad');
+  });
+}
+function gIcon(p){return L.divIcon({className:'gpw',html:'<span class="gp '+(p.free?'free':'off')+(G.sel===p.id?' sel':'')+'"></span>',iconSize:[26,26],iconAnchor:[13,13]})}
+function gDraw(){
+  var list=gShown();
+  if(G.sel&&!list.some(function(p){return p.id===G.sel}))G.sel=null;
+  if(G.group){G.group.clearLayers();list.slice(0,300).forEach(function(p){var m=L.marker([p.lat,p.lon],{icon:gIcon(p),title:p.n,keyboard:true});m.on('click',function(){gSelect(p.id)});m.addTo(G.group)})}
+  var d=$('#gdetail');if(d){d.innerHTML=gDetail();d.hidden=!G.sel;bindDetail()}
+  var l=$('#glist');
+  if(l){
+    l.innerHTML=list.length?list.slice(0,25).map(function(p){var st=p.s==='operativo'?['ok','Operativo']:p.s==='fuera'?['bad','Fuera de servicio']:['warn','Sin dato'];
+      return '<div class="rowl"><button type="button" class="rowbtn" data-gid="'+esc(p.id)+'"><span class="t"><b>'+esc(p.n)+'</b><span class="muted small">'+(p.kw?nf(p.kw)+' kW · ':'')+esc(p.conn.join(', ')||'conector sin dato')+' · '+nf(hav(G.view.lat,G.view.lon,p.lat,p.lon),1)+' km'+(p.free?'':' · de pago o sin dato')+'</span></span></button><span class="pill '+st[0]+'">'+st[1]+'</span></div>'}).join(''):'<p class="muted small">No hay nada que mostrar aquí. Mueve el mapa o activa «Mostrar todos».</p>';
+    $$('.rowbtn',l).forEach(function(b){b.addEventListener('click',function(){gSelect(b.dataset.gid,true)})});
+  }
+  var n=$('#gcount');if(n)n.textContent=list.length+' '+(G.all?'puntos':'gratis');
+}
+function gDetail(){
+  var p=G.pts.filter(function(x){return x.id===G.sel})[0];if(!p)return '';
+  return '<b>'+esc(p.n)+'</b><span class="muted small">'+esc(p.addr||'Sin dirección')+(p.op?' · '+esc(p.op):'')+'</span>'
+   +'<span class="small">'+(p.free?'Marcado como gratis':'Precio: '+(p.cost?esc(p.cost):'sin dato'))+(p.cost&&p.free?' · «'+esc(p.cost)+'»':'')+' · '+(p.kw?nf(p.kw)+' kW':'potencia sin dato')+(p.np?' · '+p.np+' puntos':'')+'</span>'
+   +'<span class="muted small">Dato de la comunidad'+(p.upd?', verificado el '+dmy(p.upd):', sin fecha de verificación')+'. Confírmalo antes de ir.</span>'
+   +'<div class="grid2"><a class="btn sm" href="https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon+'" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Cómo llegar</a><button class="btn ghost sm" id="gSave" type="button">Guardar en mis sitios</button></div>';
+}
+function bindDetail(){
+  var b=$('#gSave');if(!b)return;
+  b.addEventListener('click',function(){
+    var p=G.pts.filter(function(x){return x.id===G.sel})[0];if(!p)return;
+    if(S.spots.some(function(s){return s.oid===p.id})){toast('Ya está en tus sitios');return}
+    S.spots.unshift({id:uid(),oid:p.id,n:p.n,w:p.addr,c:(p.kw?nf(p.kw)+' kW':''),la:p.lat,lo:p.lon,date:iso(new Date())});save();toast('Guardado en tus sitios');
+  });
+}
+function gSelect(id,pan){
+  G.sel=id;gDraw();
+  var p=G.pts.filter(function(q){return q.id===id})[0];
+  if(pan&&p&&G.map)G.map.setView([p.lat,p.lon],Math.max(G.map.getZoom(),14));
+  var d=$('#gdetail');if(d&&d.scrollIntoView)d.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+function gGo(lat,lon,z){if(G.map)G.map.setView([lat,lon],z||13)}
+function mapHTML(){
+  if(!HOSTED)return '<section class="card hero"><h2>Cargadores gratis cerca de ti</h2><p class="muted">El mapa en vivo necesita la versión instalable de Vatio, porque esta ventana no puede consultar servicios externos. Mientras tanto tienes abajo la guía de sitios que suelen ser gratis y tu lista propia.</p></section>';
+  var key=getKey();
+  return '<section class="card hero"><h2>Cargadores gratis cerca de ti</h2><p class="muted small">Datos de Open Charge Map, una base abierta mantenida por la comunidad. Solo se marcan como gratis los puntos cuyo precio lo dice así.</p>'
+   +(key?'':'<div class="note warn">Falta tu clave gratuita de Open Charge Map. Créala en <a class="link" href="https://openchargemap.org/site/develop/api" target="_blank" rel="noopener">openchargemap.org</a> (en el apartado para desarrolladores de tu cuenta) y pégala aquí. Se guarda solo en este dispositivo.</div>')
+   +fld('gK','Clave de Open Charge Map',key,{type:'text',data:'placeholder="Pega aquí tu clave"'})+'</section>'
+   +'<section class="card"><div class="mapbar"><input id="gQ" type="text" placeholder="Ciudad o dirección" autocomplete="off" aria-label="Buscar un lugar"><button class="btn sm" id="gS" type="button">Buscar</button><button class="btn ghost sm" id="gM" type="button">Mi ubicación</button></div>'
+   +'<div class="chips"><button type="button" class="chip'+(G.all?'':' on')+'" id="gOnly">Solo gratis</button><button type="button" class="chip'+(G.all?' on':'')+'" id="gAll">Mostrar todos</button><span class="muted small" id="gcount" style="align-self:center;margin-left:auto"></span></div>'
+   +'<div id="gmap" role="application" aria-label="Mapa de cargadores"></div>'
+   +'<p class="note" id="gstatus" hidden></p>'
+   +'<div class="legend"><span><i class="circ" style="background:var(--accent)"></i>Gratis</span><span><i class="circ" style="background:var(--surface);border:2px solid var(--muted)"></i>De pago o sin dato</span></div>'
+   +'<div class="kv" id="gdetail" hidden style="gap:6px"></div></section>'
+   +'<section class="card"><h3>Más cerca del centro del mapa</h3><div id="glist"></div></section>';
+}
+function mapBind(){
+  if(!HOSTED)return;
+  var k=$('#gK');if(k)k.addEventListener('change',function(){setKey(k.value);render()});
+  if(typeof L==='undefined'||!L.map){gStatus('No se pudo cargar el mapa. Comprueba tu conexión.','bad');return}
+  if(G.map){try{G.map.remove()}catch(e){}G.map=null}
+  G.map=L.map('gmap',{zoomControl:true,attributionControl:true}).setView([G.view.lat,G.view.lon],G.view.z);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}).addTo(G.map);
+  G.group=L.layerGroup().addTo(G.map);
+  var el=$('#gmap');if(el&&isDark())el.classList.add('dark-tiles');
+  G.map.on('moveend',function(){var c=G.map.getCenter();G.view={lat:c.lat,lon:c.lng,z:G.map.getZoom()};clearTimeout(G.timer);G.timer=setTimeout(gLoad,700)});
+  $('#gOnly').addEventListener('click',function(){G.all=false;render()});
+  $('#gAll').addEventListener('click',function(){G.all=true;render()});
+  $('#gS').addEventListener('click',function(){
+    var q=$('#gQ').value.trim();if(!q)return;gStatus('Buscando…','ok');
+    jget('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=es&q='+encodeURIComponent(q),15000).then(function(r){
+      if(r&&r[0]){gGo(num(r[0].lat),num(r[0].lon),13)}else gStatus('No encuentro ese lugar.','warn');
+    },function(){gStatus('No se pudo buscar ese lugar.','bad')});
+  });
+  $('#gQ').addEventListener('keydown',function(e){if(e.key==='Enter')$('#gS').click()});
+  $('#gM').addEventListener('click',function(){
+    if(!navigator.geolocation){gStatus('Tu navegador no da la ubicación.','warn');return}
+    navigator.geolocation.getCurrentPosition(function(p){gGo(p.coords.latitude,p.coords.longitude,13)},function(){gStatus('No pude obtener tu ubicación. Escribe una ciudad.','warn')},{timeout:10000});
+  });
+  gDraw();gLoad();
+}
+function viewGratis(){
+  var g=gratisView();
+  return {html:mapHTML()+g.html,bind:function(){mapBind();g.bind()}};
+}
+function publicAvg(){
+  var f=new Date();f.setDate(f.getDate()-90);var fs=iso(f);
+  var L=S.log.filter(function(l){return l.date>=fs&&l.type!=='casa'});
+  var kwh=L.reduce(function(a,l){return a+l.kwh},0),dc=L.filter(function(l){return l.type==='dc'}).reduce(function(a,l){return a+l.kwh},0);
+  return {kwh:kwh/3,dc:kwh?dc/kwh*100:0,n:L.length};
+}
+function viewTarifas(){
+  var html='<section class="card" style="gap:10px">'+seg([['luz','Luz'],['pub','Públicos'],['viaje','Viaje'],['hoy','Hoy']],T.tab,'tabSeg')+'</section>';
+  if(T.tab==='viaje'||T.tab==='hoy'){var xv=(T.tab==='hoy'?hoyView:viajeView)();return {html:html+xv.html,bind:function(){onSeg($('#tabSeg').parentNode,function(v){T.tab=v;render()});xv.bind()}}}
+  var r=S.routine;
+  if(T.tab==='luz'){
+    html+='<section class="card"><h3>Tu rutina de carga en casa</h3><div class="grid2">'
+     +fld('rKm','Kilómetros a la semana',r.kmWeek,{unit:'km',min:0})+fld('rShare','Cargados en casa',r.homeShare,{unit:'%',min:0,max:100})
+     +fld('rKw','Potencia del cargador',r.kw,{unit:'kW',min:1})
+     +'<label class="f" for="rStart">Hora de inicio<select id="rStart">'+Array.apply(null,Array(24)).map(function(_,h){return '<option value="'+h+'"'+(r.start===h?' selected':'')+'>'+hh2(h)+'</option>'}).join('')+'</select></label></div>'
+     +'<div><div class="muted small" style="margin-bottom:6px">Noches en las que empiezas a cargar</div><div class="days" id="rDays">'+DAYS.map(function(d){return '<button type="button" class="chip'+(r.days.indexOf(d[0])>-1?' on':'')+'" data-d="'+d[0]+'">'+d[1]+'</button>'}).join('')+'</div></div>'
+     +'<p class="muted small" id="rSum"></p></section>'
+     +'<section class="card"><h3>Cuándo cargas frente a los tramos</h3><div id="stripOut">'+stripHTML()+'</div></section>'
+     +'<section class="card"><h3>Qué plan te sale mejor</h3><div id="rankOut" style="display:flex;flex-direction:column;gap:12px">'+rankingHTML()+'</div></section>'
+     +'<section class="card"><div class="head"><h3>Tus planes de luz</h3><span class="tag">Orientativo, '+CAT_DATE+'</span></div>'
+     +S.plans.map(function(p){
+        return '<div class="planbox" data-pid="'+p.id+'">'+fld('pn_'+p.id,'Nombre',p.n,{type:'text',data:'data-f="n"'})
+         +seg([['fija','Precio fijo'],['horaria','Por horas']],p.kind,'k_'+p.id)
+         +(p.kind==='fija'?'<div class="grid2">'+fld('pp_'+p.id,'Precio',p.llano,{unit:'€/kWh',min:0,data:'data-f="all"'})+fld('pf_'+p.id,'Cuota extra',p.fee,{unit:'€/mes',min:0,data:'data-f="fee"'})+'</div>'
+          :'<div class="grid3">'+fld('pu_'+p.id,'Punta',p.punta,{unit:'€',min:0,data:'data-f="punta"'})+fld('pl_'+p.id,'Llano',p.llano,{unit:'€',min:0,data:'data-f="llano"'})+fld('pv_'+p.id,'Valle',p.valle,{unit:'€',min:0,data:'data-f="valle"'})+'</div>'+fld('pf_'+p.id,'Cuota extra',p.fee,{unit:'€/mes',min:0,data:'data-f="fee"'}))
+         +'<button type="button" class="btn ghost sm" data-delp="'+p.id+'" style="align-self:flex-start">Quitar plan</button></div>';
+       }).join('')
+     +'<button class="btn ghost sm" id="addPlan" type="button" style="align-self:flex-start">Añadir plan</button>'
+     +'<p class="muted small">Precios orientativos de energía en €/kWh sin impuestos, recogidos de comparativas de octubre de 2026; no incluyen el término de potencia, que varía según la compañía, ni promociones. Compruébalos en la web de cada compañía. «Cuota extra» es lo que ese plan cobra de más al mes por encima de los demás, por ejemplo un servicio de mantenimiento. Para ver ofertas reales usa el <a class="link" href="https://comparador.cnmc.gob.es/" target="_blank" rel="noopener">comparador de la CNMC</a> y copia aquí los precios de las que te interesen.</p></section>';
+  }else{
+    var av=publicAvg();
+    html+='<section class="card"><h3>Tu consumo en cargadores públicos</h3><div class="head"><span class="big num" id="pkV">'+nf(S.pubKwh)+'<small>kWh/mes</small></span><span class="muted small">≈ '+nf(S.pubKwh/S.car.cons*100)+' km</span></div>'
+     +'<input id="pkR" type="range" min="0" max="600" step="10" value="'+S.pubKwh+'" aria-label="kWh al mes en cargadores públicos">'
+     +'<div class="head"><span class="big num" id="pdV">'+nf(S.pubDc)+'<small>% rápida</small></span></div><input id="pdR" type="range" min="0" max="100" step="5" value="'+S.pubDc+'" aria-label="Porcentaje de carga rápida">'
+     +(av.n?'<button class="btn ghost sm" id="useAvg" type="button" style="align-self:flex-start">Usar mi media real ('+nf(av.kwh,0)+' kWh/mes, '+nf(av.dc,0)+' % rápida)</button>':'<p class="muted small">Cuando registres cargas públicas podrás usar tu media real aquí.</p>')+'</section>'
+     +'<section class="card"><h3>Qué plan te sale mejor</h3><div id="pubOut" style="display:flex;flex-direction:column;gap:12px">'+pubOutHTML()+'</div></section>'
+     +'<section class="card"><div class="head"><h3>Operadores y bonos</h3><span class="tag">Orientativo, '+CAT_DATE+'</span></div>'
+     +S.pub.map(function(p){
+        return '<div class="planbox" data-bid="'+p.id+'">'+fld('bn_'+p.id,'Nombre',p.n,{type:'text',data:'data-f="n"'})
+         +'<div class="grid3">'+fld('bf_'+p.id,'Cuota',p.fee,{unit:'€/mes',min:0,data:'data-f="fee"'})+fld('ba_'+p.id,'Lenta',p.ac,{unit:'€/kWh',min:0,data:'data-f="ac"'})+fld('bd_'+p.id,'Rápida',p.dc,{unit:'€/kWh',min:0,data:'data-f="dc"'})+'</div>'
+         +'<button type="button" class="btn ghost sm" data-delb="'+p.id+'" style="align-self:flex-start">Quitar plan</button></div>';
+       }).join('')
+     +'<button class="btn ghost sm" id="addPub" type="button" style="align-self:flex-start">Añadir plan</button>'
+     +'<p class="muted small">Precios orientativos de octubre de 2026 sacados de comparativas, no de las webs de los operadores. Para Ionity y Tesla, que no tienen carga lenta, la columna «Lenta» es la media de otros operadores. Los precios cambian con frecuencia: cópialos de su web o su app y anota la fecha. «Cuota» es el bono mensual; el pago por uso tiene cuota 0.</p></section>';
+  }
+  return {html:html,bind:function(){
+    onSeg($('#tabSeg').parentNode,function(v){T.tab=v;render()});
+    if(T.tab==='luz'){
+      var sum=function(){var s=simRoutine(S.routine,S.routine.start);$('#rSum').textContent='Cargas unos '+nf(s.week,0)+' kWh a la semana, unos '+nf(s.week*52/12,0)+' kWh al mes, con '+S.routine.days.length+(S.routine.days.length===1?' sesión':' sesiones')+' a la semana.'};
+      var upd=function(){$('#stripOut').innerHTML=stripHTML();$('#rankOut').innerHTML=rankingHTML();sum()};
+      sum();
+      var rd=function(){S.routine.kmWeek=Math.max(0,num($('#rKm').value,0));S.routine.homeShare=clamp(num($('#rShare').value,0),0,100);S.routine.kw=Math.max(1,num($('#rKw').value,7.4));S.routine.start=clamp(parseInt($('#rStart').value,10)||0,0,23);save();upd()};
+      ['rKm','rShare','rKw','rStart'].forEach(function(id){$('#'+id).addEventListener('input',rd)});
+      $$('#rDays .chip').forEach(function(b){b.addEventListener('click',function(){
+        var d=num(b.dataset.d),i=S.routine.days.indexOf(d);if(i>-1)S.routine.days.splice(i,1);else S.routine.days.push(d);
+        b.classList.toggle('on',i===-1);save();upd();
+      })});
+      $$('.planbox[data-pid]').forEach(function(box){
+        var p=S.plans.filter(function(x){return x.id===box.dataset.pid})[0];if(!p)return;
+        $$('input[data-f]',box).forEach(function(inp){inp.addEventListener('input',function(){
+          var f=inp.dataset.f;
+          if(f==='n')p.n=inp.value;else if(f==='all'){var v=num(inp.value,0);p.punta=v;p.llano=v;p.valle=v}else p[f]=num(inp.value,0);
+          save();$('#rankOut').innerHTML=rankingHTML();
+        })});
+        onSeg($('#k_'+p.id),function(v){p.kind=v;if(v==='fija'){p.punta=p.llano;p.valle=p.llano}save();render()});
+      });
+      $$('[data-delp]').forEach(function(b){b.addEventListener('click',function(){S.plans=S.plans.filter(function(x){return x.id!==b.dataset.delp});save();render()})});
+      $('#addPlan').addEventListener('click',function(){S.plans.push({id:uid(),n:'Nuevo plan',kind:'horaria',punta:0.22,llano:0.14,valle:0.08,fee:0});save();render()});
+    }else{
+      $('#pkR').addEventListener('input',function(e){S.pubKwh=num(e.target.value);$('#pkV').innerHTML=nf(S.pubKwh)+'<small>kWh/mes</small>';save();$('#pubOut').innerHTML=pubOutHTML()});
+      $('#pdR').addEventListener('input',function(e){S.pubDc=num(e.target.value);$('#pdV').innerHTML=nf(S.pubDc)+'<small>% rápida</small>';save();$('#pubOut').innerHTML=pubOutHTML()});
+      var ua=$('#useAvg');if(ua)ua.addEventListener('click',function(){var a=publicAvg();S.pubKwh=clamp(Math.round(a.kwh/10)*10,0,600);S.pubDc=clamp(Math.round(a.dc/5)*5,0,100);save();render()});
+      $$('.planbox[data-bid]').forEach(function(box){
+        var p=S.pub.filter(function(x){return x.id===box.dataset.bid})[0];if(!p)return;
+        $$('input[data-f]',box).forEach(function(inp){inp.addEventListener('input',function(){
+          var f=inp.dataset.f;if(f==='n')p.n=inp.value;else p[f]=num(inp.value,0);
+          save();$('#pubOut').innerHTML=pubOutHTML();
+        })});
+      });
+      $$('[data-delb]').forEach(function(b){b.addEventListener('click',function(){S.pub=S.pub.filter(function(x){return x.id!==b.dataset.delb});save();render()})});
+      $('#addPub').addEventListener('click',function(){S.pub.push({id:uid(),n:'Nuevo plan',fee:0,ac:0.4,dc:0.5});save();render()});
+    }
+  }};
+}
+
+/* ---------- AJUSTES ---------- */
+var resetArm=false;
+function viewAjustes(){
+  var html='<section class="card"><h2>Tu coche</h2>'+fld('aN','Nombre',S.car.name,{type:'text'})
+   +'<div class="grid2">'+fld('aB','Batería útil de fábrica',S.car.nominal,{unit:'kWh',min:5})+fld('aC','Consumo de referencia',S.car.cons,{unit:'kWh/100 km',min:5})+fld('aA','Carga máx. en alterna',S.car.ac,{unit:'kW',min:1})+fld('aD','Carga máx. en rápida',S.car.dc,{unit:'kW',min:10})+'</div>'
+   +'<p class="muted small">La capacidad útil es la que figura en la ficha técnica del fabricante, no la bruta. Con ella se calcula el porcentaje de salud.</p></section>'
+   +'<section class="card"><h3>Precios por defecto</h3><div class="grid3">'+fld('pCa','Casa',S.price.casa,{unit:'€/kWh',min:0})+fld('pAc','Pública lenta',S.price.ac,{unit:'€/kWh',min:0})+fld('pDc','Pública rápida',S.price.dc,{unit:'€/kWh',min:0})+'</div>'
+   +'<div class="grid2">'+fld('gP','Gasolina',S.gas.price,{unit:'€/L',min:0})+fld('gL','Consumo gasolina',S.gas.l100,{unit:'L/100 km',min:1})+'</div></section>'
+   +'<section class="card"><h3>Pérdidas de carga</h3><p class="muted small">Porcentaje de la energía anotada que llega a la batería. Si el contador está en tu enchufe, las pérdidas son mayores que si lo marca el cargador público. Estos valores afectan a la estimación de salud.</p><div class="grid3">'+fld('eCa','Casa',round(S.eff.casa*100,0),{unit:'%',min:70,max:100})+fld('eAc','Pública lenta',round(S.eff.ac*100,0),{unit:'%',min:70,max:100})+fld('eDc','Pública rápida',round(S.eff.dc*100,0),{unit:'%',min:70,max:100})+'</div></section>'
+   +'<section class="card"><h3>Tus datos</h3><p class="muted small">'+(DBREF?'Se guardan en tu cuenta y en este dispositivo.':'Se guardan en este dispositivo.')+'</p><div class="grid2"><button class="btn ghost" id="exCsv" type="button">Exportar cargas (CSV)</button><button class="btn ghost" id="exEx" type="button">Quitar ejemplos</button></div>'
+   +'<div class="grid2"><button class="btn ghost" id="bkSave" type="button">Copia de seguridad</button><label class="btn ghost" style="text-align:center;cursor:pointer">Restaurar copia<input id="bkFile" type="file" accept=".json,application/json" hidden></label></div>'
+   +'<p class="muted small">La copia es un archivo con todos tus datos, sin la clave de Open Charge Map. Sirve para pasarlos entre la versión de Claude y la instalable, o para guardarlos. Restaurar sustituye lo que tengas ahora.</p>'
+   +'<button class="btn ghost" id="resetAll" type="button">'+(resetArm?'Pulsa otra vez para borrarlo todo':'Borrar todos los datos')+'</button></section>';
+  return {html:html,bind:function(){
+    var b=function(id,fn){$('#'+id).addEventListener('input',function(e){fn(e.target.value);save()})};
+    b('aN',function(v){S.car.name=v||'Mi eléctrico'});
+    b('aB',function(v){S.car.nominal=Math.max(5,num(v,60))});
+    b('aC',function(v){S.car.cons=Math.max(5,num(v,16))});
+    b('aA',function(v){S.car.ac=Math.max(1,num(v,11))});
+    b('aD',function(v){S.car.dc=Math.max(10,num(v,100))});
+    b('pCa',function(v){S.price.casa=num(v)});b('pAc',function(v){S.price.ac=num(v)});b('pDc',function(v){S.price.dc=num(v)});
+    b('gP',function(v){S.gas.price=num(v)});b('gL',function(v){S.gas.l100=Math.max(1,num(v,6))});
+    b('eCa',function(v){S.eff.casa=clamp(num(v,90),70,100)/100});b('eAc',function(v){S.eff.ac=clamp(num(v,93),70,100)/100});b('eDc',function(v){S.eff.dc=clamp(num(v,96),70,100)/100});
+    $('#bkSave').addEventListener('click',function(){saveFile('vatio-copia-'+iso(new Date())+'.json',backupText(),backupText())});
+    $('#bkFile').addEventListener('change',function(e){
+      var f=e.target.files&&e.target.files[0];if(!f)return;
+      var r=new FileReader();r.onload=function(){restoreFrom(String(r.result||''))};r.onerror=function(){toast('No se pudo leer el archivo')};r.readAsText(f);
+    });
+    $('#exCsv').addEventListener('click',function(){saveFile('cargas.csv',csvText(),csvText())});
+    $('#exEx').addEventListener('click',function(){S.log=S.log.filter(function(l){return !l.ex});S.reads=S.reads.filter(function(r){return !r.ex});save();toast('Ejemplos quitados')});
+    $('#resetAll').addEventListener('click',function(){
+      if(!resetArm){resetArm=true;render();setTimeout(function(){resetArm=false;if(tab==='ajustes')render()},4000);return}
+      resetArm=false;S=defaults();S.log=[];S.reads=[];S.plans=defaults().plans;S.pub=defaults().pub;save();applyTheme();render();toast('Datos borrados');
+    });
+  }};
+}
+
+
+/* ---------- COPIA DE SEGURIDAD ---------- */
+var restoreArm=false;
+function backupText(){return JSON.stringify({app:'vatio',v:1,date:iso(new Date()),state:S},null,1)}
+function restoreFrom(txt){
+  var o;try{o=JSON.parse(txt)}catch(e){toast('El archivo no es una copia de Vatio');return false}
+  var st=o&&o.app==='vatio'&&o.state;
+  if(!st||typeof st!=='object'||!Array.isArray(st.log)){toast('El archivo no es una copia de Vatio');return false}
+  S=merge(defaults(),st);save();applyTheme();render();toast('Copia restaurada: '+S.log.length+' cargas');return true;
+}
+
+/* ---------- TRAMO AHORA (Inicio) ---------- */
+var PNAME={punta:'punta',llano:'llano',valle:'valle'};
+function nowTramoHTML(){
+  var d=new Date(),day=d.getDay(),hr=d.getHours(),cur=periodOf(day,hr),nx=null;
+  for(var i=1;i<=48;i++){var t=new Date(d.getTime()+i*3600000);if(periodOf(t.getDay(),t.getHours())==='valle'&&periodOf(new Date(t.getTime()-3600000).getDay(),new Date(t.getTime()-3600000).getHours())!=='valle'){nx={h:t.getHours(),in:i,day:t.getDay()};break}}
+  var msg=cur==='valle'?'Estás en tramo valle: es la hora más barata para cargar.':(cur==='llano'?'Estás en tramo llano.':'Estás en tramo punta: la hora más cara.');
+  var nextTxt=cur==='valle'?'':(nx?'El próximo valle empieza a las '+hh2(nx.h)+(nx.in<24?' (dentro de '+nx.in+' h).':'.'):'');
+  return '<section class="card"><div class="head"><h3>Ahora mismo</h3><span class="pill '+(cur==='valle'?'ok':(cur==='llano'?'warn':'bad'))+'">'+PNAME[cur]+'</span></div><p>'+msg+' '+nextTxt+'</p><p class="muted small">Sábados y domingos todo es valle. Los festivos nacionales no se detectan: ese día también sería valle.</p></section>';
+}
+
+/* ---------- PRECIO DE LA LUZ HOY (versión alojada) ---------- */
+var TODAY={prices:null,status:'',loading:false,hours:3};
+function parseREE(j){
+  var inc=(j&&j.included)||[],pick=null;
+  inc.forEach(function(x){if(!pick&&x&&/pvpc/i.test(String(x.type||'')+' '+String((x.attributes&&x.attributes.title)||'')))pick=x});
+  if(!pick||!pick.attributes||!pick.attributes.values)return null;
+  var out=[];for(var i=0;i<24;i++)out.push(null);
+  pick.attributes.values.forEach(function(v){var hh=parseInt(String(v.datetime).substr(11,2),10);if(hh>=0&&hh<24&&isFinite(v.value))out[hh]=v.value/1000});
+  return out.some(function(x){return x!==null})?out:null;
+}
+function bestWindow(pr,n){
+  var best=null;
+  for(var s=0;s+n<=24;s++){var sum=0,ok=true;for(var k=0;k<n;k++){if(pr[s+k]===null){ok=false;break}sum+=pr[s+k]}if(ok&&(!best||sum<best.sum))best={s:s,sum:sum}}
+  return best;
+}
+function todayChart(pr,win){
+  var vals=pr.filter(function(x){return x!==null}),mx=Math.max.apply(null,vals),mn=Math.min.apply(null,vals);
+  var W=340,H=170,l=6,r=6,t=22,b=26,pw=W-l-r,ph=H-t-b,bw=pw/24,nowH=new Date().getHours();
+  var s='<svg class="gauge" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Precio de la luz hora a hora">';
+  pr.forEach(function(v,i){
+    if(v===null)return;
+    var hgt=Math.max(3,v/mx*ph),x=l+i*bw,y=t+ph-hgt,inW=win&&i>=win.s&&i<win.s+TODAY.hours;
+    s+='<rect class="'+(inW?'fillc':'')+'" style="--k:'+(i%6)+'" data-tip="'+hh2(i)+'\n'+nf(v,3)+' €/kWh" x="'+(x+1).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+(bw-2).toFixed(1)+'" height="'+hgt.toFixed(1)+'" rx="2.5" fill="'+(inW?'var(--accent)':'var(--muted)')+'" opacity="'+(inW?1:0.45)+'"'+(i===nowH?' stroke="var(--fg)" stroke-width="1.5"':'')+'/>';
+  });
+  [0,6,12,18,23].forEach(function(i){s+='<text class="svt" x="'+(l+i*bw+bw/2).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle">'+i+'h</text>'});
+  s+='<text class="svt fg lbl" x="'+l+'" y="12">Máx. '+nf(mx,3)+' · Mín. '+nf(mn,3)+' €/kWh</text>';
+  return s+'</svg>';
+}
+function hoyHTML(){
+  if(!HOSTED)return '<section class="card hero"><h2>Precio de la luz hoy</h2><p class="muted">Esta sección consulta a Red Eléctrica y necesita la versión instalable de Vatio. Aquí dentro no se pueden consultar servicios externos.</p></section>';
+  var h='<section class="card hero"><h2>Precio de la luz hoy</h2><p class="muted small">Precio PVPC hora a hora de Red Eléctrica. Solo vale si tienes la tarifa regulada (PVPC); si tienes un plan de mercado libre, tus precios son los de tu plan.</p></section>';
+  if(TODAY.loading)return h+'<section class="card"><p class="muted">Consultando precios…</p></section>';
+  if(!TODAY.prices)return h+'<section class="card"><p class="note '+(TODAY.status?'warn':'')+'">'+esc(TODAY.status||'Todavía no se han consultado los precios.')+'</p><button class="btn" id="hoyGo" type="button">Consultar precios de hoy</button></section>';
+  var win=bestWindow(TODAY.prices,TODAY.hours);
+  return h+'<section class="card"><div class="head"><h3>Hora a hora</h3><label class="f" style="flex-direction:row;align-items:center;gap:8px" for="hoyN">Carga de<select id="hoyN">'+[1,2,3,4,5,6,8].map(function(n){return '<option value="'+n+'"'+(TODAY.hours===n?' selected':'')+'>'+n+' h</option>'}).join('')+'</select></label></div>'
+   +todayChart(TODAY.prices,win)
+   +(win?'<div class="note ok">Lo más barato para cargar '+TODAY.hours+' h seguidas: de <b>'+hh2(win.s)+'</b> a <b>'+hh2((win.s+TODAY.hours)%24)+'</b>, a unos <b>'+nf(win.sum/TODAY.hours,3)+' €/kWh</b> de media.</div>':'')
+   +'<p class="muted small">El recuadro negro marca la hora actual. Los precios son de la energía y no incluyen peajes, cargos ni impuestos.</p><button class="btn ghost sm" id="hoyGo" type="button" style="align-self:flex-start">Actualizar</button></section>';
+}
+function hoyLoad(){
+  TODAY.loading=true;render();
+  var d=new Date(),ds=iso(d);
+  jget('https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real?start_date='+ds+'T00:00&end_date='+ds+'T23:59&time_trunc=hour',20000).then(function(j){
+    TODAY.prices=parseREE(j);TODAY.status=TODAY.prices?'':'Red Eléctrica no devolvió precios PVPC para hoy.';TODAY.loading=false;render();
+  },function(e){TODAY.loading=false;TODAY.status='No se pudieron consultar los precios ('+(e&&e.message?e.message:'sin conexión')+').';render()});
+}
+function hoyView(){
+  return {html:hoyHTML(),bind:function(){
+    var g=$('#hoyGo');if(g)g.addEventListener('click',hoyLoad);
+    var n=$('#hoyN');if(n)n.addEventListener('change',function(){TODAY.hours=parseInt(n.value,10)||3;render()});
+    if(HOSTED&&!TODAY.prices&&!TODAY.loading&&!TODAY.status)hoyLoad();
+  }};
+}
+
+/* ---------- RUTA CON PARADAS (versión alojada) ---------- */
+var RT={o:'',d:'',status:'',stops:null,busy:false};
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms)})}
+function geocode(q){return jget('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=es&q='+encodeURIComponent(q),15000).then(function(r){if(!r||!r[0])throw new Error('no encuentro «'+q+'»');return {lat:parseFloat(r[0].lat),lon:parseFloat(r[0].lon)}})}
+function pointAt(coords,total,dkm){
+  var cum=[0];for(var i=1;i<coords.length;i++)cum.push(cum[i-1]+hav(coords[i-1][1],coords[i-1][0],coords[i][1],coords[i][0]));
+  var len=cum[cum.length-1]||1,target=dkm/total*len;
+  for(var j=1;j<coords.length;j++){if(cum[j]>=target){var f=(target-cum[j-1])/Math.max(1e-9,cum[j]-cum[j-1]);return {lat:coords[j-1][1]+(coords[j][1]-coords[j-1][1])*f,lon:coords[j-1][0]+(coords[j][0]-coords[j-1][0])*f}}}
+  var e=coords[coords.length-1];return {lat:e[1],lon:e[0]};
+}
+function routeGo(){
+  var key=getKey();
+  if(!RT.o.trim()||!RT.d.trim()){toast('Escribe origen y destino');return}
+  if(!key){RT.status='Falta la clave de Open Charge Map (pestaña Gratis).';rtShow();return}
+  RT.busy=true;RT.stops=null;RT.status='Buscando la ruta…';rtShow();
+  var A,B,route;
+  geocode(RT.o).then(function(a){A=a;return sleep(1100)}).then(function(){return geocode(RT.d)}).then(function(b){B=b;
+    return jget('https://router.project-osrm.org/route/v1/driving/'+A.lon+','+A.lat+';'+B.lon+','+B.lat+'?overview=simplified&geometries=geojson',20000)
+  }).then(function(j){
+    if(!j||!j.routes||!j.routes[0])throw new Error('sin ruta por carretera');
+    route=j.routes[0];S.trip.km=Math.max(1,Math.round(route.distance/1000));save();
+    var r=tripCalc(),total=route.distance/1000,pos=[],cons=r.cons,cap=r.cap;
+    var d=cap*Math.max(0,S.trip.soc-S.trip.arr)/100/cons*100;
+    while(pos.length<r.stops&&d<total-5){pos.push(d);d+=cap*0.6/cons*100}
+    RT.stops=[];RT.status=pos.length?'Buscando cargadores en cada parada…':'';
+    rtShow();
+    var chain=Promise.resolve();
+    pos.forEach(function(dk){chain=chain.then(function(){
+      var p=pointAt(route.geometry.coordinates,total,dk);
+      return jget('https://api.openchargemap.io/v3/poi?output=json&latitude='+p.lat.toFixed(5)+'&longitude='+p.lon.toFixed(5)+'&distance=12&distanceunit=KM&maxresults=150&compact=false&verbose=false&countrycode=ES&key='+encodeURIComponent(key),25000).then(function(arr){
+        var pts=(Array.isArray(arr)?arr:[]).map(normOCM).filter(function(q){return q&&q.s!=='fuera'&&q.kw>=50});
+        pts.sort(function(a,b){return (b.free-a.free)||(b.kw-a.kw)});
+        RT.stops.push({km:dk,pts:pts.slice(0,3)});
+      });
+    })});
+    return chain;
+  }).then(function(){RT.busy=false;RT.status=RT.stops&&RT.stops.length?'':(RT.status||'');if(RT.stops&&!RT.stops.length)RT.status='El trayecto no necesita paradas con tu batería.';render()},function(e){RT.busy=false;RT.status='No se pudo completar ('+(e&&e.message?e.message:'sin conexión')+').';render()});
+}
+function rtShow(){var el=$('#rtOut');if(el)el.innerHTML=rtHTML()}
+function rtHTML(){
+  var h='';
+  if(RT.status)h+='<p class="note '+(RT.busy?'ok':'warn')+'">'+esc(RT.status)+'</p>';
+  if(RT.stops&&RT.stops.length)h+=RT.stops.map(function(st,i){
+    return '<div class="planbox"><b>Parada '+(i+1)+' · hacia el km '+nf(st.km,0)+'</b>'
+     +(st.pts.length?st.pts.map(function(p){return '<div class="rowl"><div class="t"><b>'+esc(p.n)+'</b><span class="muted small">'+nf(p.kw)+' kW · '+(p.free?'marcado como gratis':'precio: '+(p.cost?esc(p.cost):'sin dato'))+(p.op?' · '+esc(p.op):'')+'</span></div><a class="link small" href="https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon+'" target="_blank" rel="noopener">Ir</a></div>'}).join(''):'<p class="muted small">No hay cargadores rápidos registrados cerca de este punto. Prueba a adelantar o retrasar la parada.</p>')+'</div>';
+  }).join('');
+  return h;
+}
+function rutaCardHTML(){
+  if(!HOSTED)return '<section class="card plain"><p class="small muted">La búsqueda de cargadores a lo largo de la ruta necesita la versión instalable de Vatio.</p></section>';
+  return '<section class="card"><h3>Cargadores en tu ruta</h3><p class="muted small">Calcula la ruta por carretera y busca cargadores rápidos (50 kW o más) cerca de cada parada, con los gratis primero. Usa los datos de batería de arriba.</p>'
+   +fld('rtO','Origen',RT.o,{type:'text',data:'placeholder="Madrid"'})+fld('rtD','Destino',RT.d,{type:'text',data:'placeholder="Valencia"'})
+   +'<button class="btn" id="rtGo" type="button">Buscar paradas</button><div id="rtOut" style="display:flex;flex-direction:column;gap:10px">'+rtHTML()+'</div></section>';
+}
+
+/* ---------- COSTE POR TIPO Y RESUMEN ANUAL (Cargas) ---------- */
+function typeCosts(){
+  var out=[],c=consStats(),consB=c.km?c.cons:S.car.cons/S.eff.casa;
+  [['casa','Casa'],['ac','Pública lenta'],['dc','Pública rápida']].forEach(function(t){
+    var L=S.log.filter(function(l){return l.type===t[0]&&l.kwh>0}),k=L.reduce(function(a,l){return a+l.kwh},0),e=L.reduce(function(a,l){return a+l.cost},0);
+    if(k>0)out.push({k:t[0],n:t[1],kwh:k,eurkwh:e/k,per100:e/k*consB,count:L.length});
+  });
+  return out;
+}
+function typeCostsHTML(){
+  var t=typeCosts();
+  if(!t.length)return '<p class="muted small">Cuando registres cargas verás aquí cuánto te cuesta cada 100 km según dónde cargas.</p>';
+  var mx=Math.max.apply(null,t.map(function(x){return x.per100}))||1,mn=Math.min.apply(null,t.map(function(x){return x.per100}));
+  return '<div class="bars">'+t.map(function(x){return '<div class="barrow'+(x.per100===mn?' best':'')+'"><span>'+x.n+' <span class="muted small">· '+nf(x.eurkwh,3)+' €/kWh</span></span><b class="num">'+eur(x.per100)+' /100 km</b><div class="trk"><i style="width:'+Math.max(3,x.per100/mx*100).toFixed(0)+'%"></i></div></div>'}).join('')+'</div>';
+}
+function yearHTML(){
+  var y=String(new Date().getFullYear()),L=S.log.filter(function(l){return String(l.date).slice(0,4)===y});
+  if(!L.length)return '<p class="muted small">Todavía no hay cargas de este año.</p>';
+  var k=L.reduce(function(a,l){return a+l.kwh},0),e=L.reduce(function(a,l){return a+l.cost},0);
+  var fk=L.filter(function(l){return l.type!=='casa'&&l.cost===0}).reduce(function(a,l){return a+l.kwh},0);
+  var km=k*0.92/S.car.cons*100,gas=km*S.gas.l100/100*S.gas.price;
+  return '<div class="grid2">'+kv(String(L.length),'Cargas en '+y)+kv(nf(k,0)+' kWh','Energía')+kv(eur(e,0),'Gasto')+kv(nf(fk,0)+' kWh','Gratis fuera de casa')+'</div>'
+   +'<div class="note ok">Con ese gasto has recorrido unos '+nf(km,0)+' km (estimado). En gasolina habrían costado unos <b>'+eur(gas,0)+'</b>: ahorras unos <b>'+eur(Math.max(0,gas-e),0)+'</b>.</div>';
+}
+
+/* ---------- Navegación ---------- */
+var VIEWS={inicio:viewInicio,bateria:viewBateria,cargas:viewCargas,tarifas:viewTarifas,gratis:viewGratis,ajustes:viewAjustes};
+function render(){
+  hideTip();
+  var v=VIEWS[tab]();
+  main.className='';main.innerHTML=v.html;
+  Array.prototype.forEach.call(main.children,function(c,i){c.style.setProperty('--i',Math.min(i,8))});
+  void main.offsetWidth;main.className='vin';
+  if(v.bind)v.bind();
+  $$('#tabs button').forEach(function(b){b.setAttribute('aria-current',b.dataset.tab===tab?'page':'false')});
+}
+function go(t){
+  tab=t;render();window.scrollTo(0,0);
+  try{history.replaceState(null,'','#'+t)}catch(e){}
+}
+$('#tabs').innerHTML=TABS.map(function(t){return '<button type="button" data-tab="'+t[0]+'"><svg viewBox="0 0 24 24" aria-hidden="true">'+t[2]+'</svg>'+t[1]+'</button>'}).join('');
+$$('#tabs button').forEach(function(b){b.addEventListener('click',function(){go(b.dataset.tab)})});
+$('#themeBtn').addEventListener('click',function(){S.theme=isDark()?'light':'dark';save();applyTheme()});
+applyTheme();
+var h0=(location.hash||'').replace('#','');
+if(VIEWS[h0])tab=h0;
+render();
+initStore();
+})();
+</script>
+
+<script>if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}</script>
+</body></html>

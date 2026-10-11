@@ -1,0 +1,24 @@
+VATIO EV - cómo publicarla gratis (sin saber programar)
+
+1. Descomprime este ZIP. Obtendrás una carpeta con index.html y otros archivos.
+2. Entra en https://app.netlify.com/drop desde un ordenador y crea una cuenta gratuita si te la pide.
+3. Arrastra la carpeta entera a la zona que dice "Drop your site folder here".
+4. En un minuto tendrás una dirección web (algo como https://nombre.netlify.app). Esa es tu app.
+5. Abre esa dirección en el móvil con Chrome. Menú de los tres puntos, "Instalar aplicación".
+
+Para ver cargadores gratis reales:
+1. Crea una cuenta gratuita en https://openchargemap.org y pide una clave de API (los pasos están en su apartado "develop").
+2. En la app, pestaña Gratis, pega la clave en "Clave de Open Charge Map". Se guarda solo en tu dispositivo.
+3. Pulsa "Mi ubicación" (acepta el permiso) o escribe una ciudad.
+
+Los puntos verdes son los que Open Charge Map marca como gratis. Esos datos los rellena la comunidad: confírmalos antes de ir.
+
+Importante: los datos de esta versión (cargas, lecturas, tarifas) se guardan solo en el navegador del dispositivo donde la uses. No se comparten con la versión de Claude.
+
+Si cambias algún archivo, vuelve a arrastrar la carpeta a Netlify Drop (en tu panel de Netlify, pestaña Deploys).
+
+ALTERNATIVA: GitHub Pages (gratis, se puede hacer desde el móvil con el navegador en "versión de escritorio")
+1. Crea una cuenta en https://github.com y un repositorio nuevo, público, por ejemplo "vatio".
+2. "Add file", "Upload files": sube TODOS los archivos de la carpeta (index.html, sw.js, manifest.webmanifest y los iconos). Pulsa "Commit changes".
+3. Ve a Settings, Pages. En "Branch" elige "main" y la carpeta "/ (root)". Guarda.
+4. En uno o dos minutos tu app estará en https://TUUSUARIO.github.io/vatio/
