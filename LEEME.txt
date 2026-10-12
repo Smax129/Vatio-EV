@@ -22,3 +22,5 @@ ALTERNATIVA: GitHub Pages (gratis, se puede hacer desde el móvil con el navegad
 2. "Add file", "Upload files": sube TODOS los archivos de la carpeta (index.html, sw.js, manifest.webmanifest y los iconos). Pulsa "Commit changes".
 3. Ve a Settings, Pages. En "Branch" elige "main" y la carpeta "/ (root)". Guarda.
 4. En uno o dos minutos tu app estará en https://TUUSUARIO.github.io/vatio/
+
+NUBE Y CUENTA (opcional, gratis): en la app, Ajustes, "Cuenta y nube". Sigue los 5 pasos que aparecen ahí para crear tu proyecto de Firebase y pega el bloque firebaseConfig. Después crea tu cuenta con un correo y una contraseña. Tus datos se guardan en TU proyecto de Firebase y se sincronizan entre tus dispositivos.

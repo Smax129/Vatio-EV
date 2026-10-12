@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0A7C78"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#F1F5F4"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>html,body{margin:0}body{min-height:100vh}</style>
 <title>Vatio EV</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap">
@@ -34,7 +34,7 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45;padding-inline:16px;padding-block:0;-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:var(--fs,15px);line-height:1.45;padding-inline:16px;padding-block:0;-webkit-text-size-adjust:100%}
 .app{max-width:560px;margin:0 auto;min-height:100%}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -139,6 +139,7 @@ th{color:var(--muted);font-weight:500}
 .gp.free{border-color:var(--accent);background:var(--accent)}
 .gp.sel{outline:3px solid var(--fg);outline-offset:2px}
 .gp.off{opacity:.45}
+.gp.maybe{border-color:var(--accent);background:var(--surface)}
 .mapbar{display:flex;gap:8px;flex-wrap:wrap}
 .mapbar input{flex:1;min-width:140px}
 .hero{background:linear-gradient(135deg,var(--accent-soft),var(--surface));position:relative;overflow:hidden}
@@ -162,6 +163,12 @@ th{color:var(--muted);font-weight:500}
   .toast{animation:rise .3s ease-out both}
 }
 @media (prefers-reduced-motion:reduce){.card{animation:none}}
+.noanim *,.noanim *::before,.noanim *::after{animation:none!important;transition:none!important}
+.sw{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-sm);padding:9px 10px;font-size:.84rem;text-align:left;min-width:0}
+.sw i{width:18px;height:18px;border-radius:50%;background:var(--c);flex:none;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line)}
+.sw[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.pre{background:var(--surface2);border-radius:var(--r-sm);padding:10px;font:.78rem/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;user-select:all}
+input[type=color]{width:100%;height:44px;padding:2px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface)}
 </style>
 
 <div class="app">
@@ -173,8 +180,8 @@ th{color:var(--muted);font-weight:500}
 </div>
 <div class="tabbar"><nav id="tabs" aria-label="Secciones"></nav></div>
 <div class="tip" id="tip" hidden></div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
 (function(){
 'use strict';
@@ -222,7 +229,7 @@ function catPub(){return [
 function defaults(){
   var s={
     theme:'auto', soc:55,
-    car:{name:'Mi eléctrico',nominal:60,cons:16.5,ac:11,dc:120},
+    car:{name:'Mi eléctrico',model:'',year:'',plate:'',odo:0,range:0,nominal:60,cons:16.5,ac:11,dc:120},
     price:{casa:0.11,ac:0.35,dc:0.55},
     eff:{casa:0.90,ac:0.93,dc:0.96},
     gas:{price:1.55,l100:6.5},
@@ -231,6 +238,8 @@ function defaults(){
     pub:catPub(),
     cat:2,
     pubKwh:100, pubDc:70,
+    costs:[], rem:[],
+    ui:{pal:'teal',custom:'#0A7C78',fs:15,round:'md',anim:true},upd:0,
     spots:[], trip:{km:400,speed:120,temp:15,soc:90,arr:10},
     log:[], reads:[]
   };
@@ -254,10 +263,12 @@ function seed(s){
 function merge(base,o){
   if(!o||typeof o!=='object')return base;
   for(var k in o){base[k]=o[k]}
-  ['car','price','eff','gas','routine'].forEach(function(k){var d=defaults()[k];for(var j in d){if(base[k][j]===undefined)base[k][j]=d[j]}});
+  ['car','price','eff','gas','routine','ui'].forEach(function(k){var d=defaults()[k];for(var j in d){if(base[k][j]===undefined)base[k][j]=d[j]}});
   if(o.cat!==2&&Array.isArray(base.plans)&&Array.isArray(base.pub)&&base.plans.every(function(p){return /ejemplo/.test(p.n)})&&base.pub.every(function(p){return /ejemplo/.test(p.n)})){base.plans=catPlans();base.pub=catPub()}
   base.cat=2;
   if(!Array.isArray(base.spots))base.spots=[];
+  if(!Array.isArray(base.costs))base.costs=[];
+  if(!Array.isArray(base.rem))base.rem=[];
   if(!base.trip||typeof base.trip!=='object')base.trip={};
   var dt=defaults().trip;for(var tj in dt){if(typeof base.trip[tj]!=='number')base.trip[tj]=dt[tj]}
   if(!Array.isArray(base.log))base.log=[];if(!Array.isArray(base.reads))base.reads=[];
@@ -268,13 +279,15 @@ function loadLocal(){
   return defaults();
 }
 var S=loadLocal();
+try{if(typeof window.claude==='undefined'&&navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
 
 /* ---------- Guardado: cuenta (db) con copia local ---------- */
 var DBREF=null,dbReady=false,dirty=false,saveT=null,saving=false,pending=false;
 function save(){
-  dirty=true;
+  dirty=true;S.upd=Date.now();
   try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
   clearTimeout(saveT);saveT=setTimeout(flush,700);
+  if(typeof clSchedule==='function')clSchedule();
 }
 function flush(){
   if(!DBREF||!dbReady)return;
@@ -426,10 +439,11 @@ var ICON={
   bat:'<rect x="2.5" y="7.5" width="16" height="9" rx="2.5"/><path d="M21 10.5v3M6 10.5v3M10 10.5v3"/>',
   bolt:'<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>',
   tag:'<path d="M20 12l-8 8-9-9V4h7z"/><circle cx="8" cy="8" r="1.3"/>',
+  car:'<path d="M5 16l1.5-5a2 2 0 0 1 1.9-1.4h7.2a2 2 0 0 1 1.9 1.4L19 16"/><rect x="3" y="16" width="18" height="4" rx="1.5"/><path d="M7.5 18h.01M16.5 18h.01"/>',
   pin:'<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
   set:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'
 };
-var TABS=[['inicio','Inicio',ICON.home],['bateria','Batería',ICON.bat],['cargas','Cargas',ICON.bolt],['tarifas','Tarifas',ICON.tag],['gratis','Gratis',ICON.pin],['ajustes','Ajustes',ICON.set]];
+var TABS=[['inicio','Inicio',ICON.home],['coche','Coche',ICON.car],['cargas','Cargas',ICON.bolt],['tarifas','Tarifas',ICON.tag],['gratis','Gratis',ICON.pin],['ajustes','Ajustes',ICON.set]];
 var tab='inicio';
 var main=$('#main');
 function seg(opts,cur,id){return '<div class="seg"'+(id?' id="'+id+'"':'')+' role="tablist">'+opts.map(function(o){return '<button type="button" role="tab" aria-selected="'+(o[0]===cur)+'" class="'+(o[0]===cur?'on':'')+'" data-v="'+o[0]+'">'+o[1]+'</button>'}).join('')+'</div>'}
@@ -442,10 +456,42 @@ function toast(msg){
   t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.textContent=msg;document.body.appendChild(t);
   clearTimeout(toastT);toastT=setTimeout(function(){t.remove()},2600);
 }
-function applyTheme(){
-  var r=document.documentElement;
-  if(S.theme==='light'||S.theme==='dark')r.setAttribute('data-theme',S.theme);else r.removeAttribute('data-theme');
+var PALS={
+  teal:{n:'Turquesa',l:'#0A7C78',d:'#3FCBC3'},
+  azul:{n:'Azul',l:'#1F5FBF',d:'#6AA7FF'},
+  violeta:{n:'Violeta',l:'#6B3FC4',d:'#B79CFF'},
+  naranja:{n:'Naranja',l:'#B4530A',d:'#FFA55C'},
+  rosa:{n:'Rosa',l:'#B8286B',d:'#FF8FBF'},
+  verde:{n:'Verde',l:'#2E7D32',d:'#7BD67F'},
+  grafito:{n:'Grafito',l:'#3A4A5A',d:'#B8C7D6'}
+};
+function hex2rgb(x){x=String(x||'').replace('#','');if(x.length===3)x=x.split('').map(function(c){return c+c}).join('');var n=parseInt(x,16);return isFinite(n)&&x.length===6?[(n>>16)&255,(n>>8)&255,n&255]:[10,124,120]}
+function rgb2hex(c){return '#'+c.map(function(v){v=Math.max(0,Math.min(255,Math.round(v)));return (v<16?'0':'')+v.toString(16)}).join('')}
+function mixc(a,b,t){var A=hex2rgb(a),B=hex2rgb(b);return rgb2hex([A[0]+(B[0]-A[0])*t,A[1]+(B[1]-A[1])*t,A[2]+(B[2]-A[2])*t])}
+function lum(c){var v=hex2rgb(c).map(function(x){x/=255;return x<=0.03928?x/12.92:Math.pow((x+0.055)/1.055,2.4)});return 0.2126*v[0]+0.7152*v[1]+0.0722*v[2]}
+function contrast(a,b){var x=lum(a),y=lum(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05)}
+function fixAccent(c,dark){
+  var bg=dark?'#111E1D':'#FFFFFF',g=0;
+  while(contrast(c,bg)<4.5&&g++<20)c=dark?mixc(c,'#FFFFFF',0.12):mixc(c,'#000000',0.12);
+  return c;
 }
+function applyTheme(){
+  var r=document.documentElement,u=S.ui||{};
+  if(S.theme==='light'||S.theme==='dark')r.setAttribute('data-theme',S.theme);else r.removeAttribute('data-theme');
+  var dark=isDark(),base=u.pal==='custom'?(u.custom||'#0A7C78'):((PALS[u.pal]||PALS.teal)[dark?'d':'l']);
+  var acc=fixAccent(base,dark),st=r.style,bg=dark?'#0A1413':'#F1F5F4';
+  st.setProperty('--accent',acc);
+  st.setProperty('--accent-ink',contrast(acc,'#FFFFFF')>=contrast(acc,'#04201F')?'#FFFFFF':'#04201F');
+  st.setProperty('--accent-soft',mixc(acc,dark?'#111E1D':'#FFFFFF',dark?0.78:0.82));
+  if(dark){st.setProperty('--seq1',mixc(acc,bg,0.7));st.setProperty('--seq2',mixc(acc,bg,0.35));st.setProperty('--seq3',mixc(acc,'#FFFFFF',0.3))}
+  else{st.setProperty('--seq1',mixc(acc,'#FFFFFF',0.75));st.setProperty('--seq2',mixc(acc,'#FFFFFF',0.4));st.setProperty('--seq3',acc)}
+  st.setProperty('--fs',(u.fs||15)+'px');
+  var rr={sm:['4px','3px'],md:['18px','12px'],lg:['26px','16px']}[u.round]||['18px','12px'];
+  st.setProperty('--r',rr[0]);st.setProperty('--r-sm',rr[1]);
+  r.classList.toggle('noanim',u.anim===false);
+  try{var m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute('content',bg)}catch(e){}
+}
+try{if(window.matchMedia)window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',function(){if(!S.theme||S.theme==='auto'){applyTheme();render()}})}catch(e){}
 function isDark(){
   var t=document.documentElement.getAttribute('data-theme');
   if(t)return t==='dark';
@@ -573,6 +619,7 @@ function viewInicio(){
    +gaugeSVG(h.val)
    +'<div class="head"><div><div class="big">'+(h.val!==null?nf(h.val,0)+'<small>% de salud</small>':'<small>Sin datos todavía</small>')+'</div><div class="muted small">'+(h.val!==null?(h.basis==='calc'?'Estimada con '+h.used+' cargas':'Según tu última lectura'):'Registra cargas de al menos 30 puntos de batería')+'</div></div>'+(v?'<span class="pill '+v[0]+'">'+v[1]+'</span>':'')+'</div>'
    +'<button class="btn ghost" type="button" data-go="bateria">Ver detalle de la batería</button></section>'
+   +remAlertsHTML()
    +nowTramoHTML()
    +'<section class="card"><h3>¿Cuánto cargo para mañana?</h3>'
    +'<div class="grid2">'+fld('nKm','Kilómetros',NEED.km,{unit:'km',min:0})+fld('nT','Temperatura',NEED.T,{unit:'°C'})+'</div>'
@@ -638,7 +685,7 @@ function viewBateria(){
    +(h.val!==null?'<div class="head"><div><div class="big">'+nf(h.val,0)+'<small>%</small></div><div class="muted small">'+nf(h.cap,1)+' kWh útiles de '+nf(S.car.nominal,1)+'</div></div><span class="pill '+v[0]+'">'+v[1]+'</span></div>'
      +'<div class="grid2">'+kv(h.basis==='calc'?nf(h.lo,0)+'–'+nf(h.hi,0)+' %':'—','Rango de tus estimaciones')+kv(h.man?nf(h.man.soh,0)+' %':'—','Última lectura manual'+(h.man?' · '+dmy(h.man.date):''))+'</div>'
      +'<p class="muted small">'+(h.basis==='calc'?'Mediana de tus últimas '+h.used+' cargas largas.':'Aún no hay cargas largas suficientes; uso tu lectura manual.')+' Es una estimación con un margen de varios puntos.</p>'
-     :'<div class="note">Todavía no hay datos. Registra una carga larga (30 puntos de batería o más) con los kWh que marca tu cargador o contador, o apunta abajo una lectura de la app del coche.</div>')
+     :'<div class="note">Todavía no hay datos. No tienes que introducir la salud: la app la calcula sola. Registra una carga larga (de 30 puntos de batería o más) con los kWh que marca tu cargador o contador, aquí abajo.</div>')
    +'</section>';
   html+='<section class="card"><div class="head"><h3>Evolución</h3><span class="muted small">'+h.pts.length+' puntos</span></div>'+sohChart(h.pts,tr)
    +'<div class="legend"><span><i class="circ" style="background:var(--accent)"></i>Estimada con una carga</span><span><i class="dia" style="background:var(--s2)"></i>Lectura manual</span>'+(tr?'<span><i style="background:transparent;border-top:2px dashed var(--accent);height:0;border-radius:0"></i>Tendencia</span>':'')+'</div>';
@@ -650,10 +697,11 @@ function viewBateria(){
   }else if(h.pts.length)html+='<p class="muted small">La tendencia aparece con 4 o más puntos repartidos en al menos 3 meses.</p>';
   html+='<details class="tbl"><summary>Ver tabla de datos</summary><div class="tblwrap"><table><thead><tr><th>Fecha</th><th>Salud</th><th>Origen</th></tr></thead><tbody>'
    +h.pts.slice().reverse().map(function(p){return '<tr><td>'+dmy(p.date)+'</td><td>'+nf(p.soh,1)+' %</td><td>'+(p.src==='calc'?'Carga':'Manual')+(p.ex?' (ejemplo)':'')+'</td></tr>'}).join('')+'</tbody></table></div></details></section>';
-  html+='<section class="card"><h3>Apuntar lectura de salud</h3><p class="muted small">Algunos coches y apps de diagnóstico muestran el estado de salud (SoH). Si lo ves, anótalo.</p><form id="rdForm" class="grid2">'
+  html+=quickChargeHTML()+rangeCardHTML()+qualityHTML();
+  html+='<section class="card"><details class="tbl"><summary>Opcional: apuntar la salud que muestra mi coche</summary><p class="muted small" style="margin-top:8px">Solo si tu coche o una app de diagnóstico te enseña el estado de salud (SoH). No hace falta para que la app funcione.</p><form id="rdForm" class="grid2">'
    +fld('rdDate','Fecha',iso(new Date()),{type:'date'})+fld('rdPct','Salud',93,{unit:'%',min:40,max:110})
    +'<button class="btn" type="submit" style="grid-column:1/-1">Guardar lectura</button></form>'
-   +(S.reads.length?'<div>'+S.reads.slice().sort(function(a,b){return a.date<b.date?1:-1}).map(function(r){return '<div class="rowl"><div class="t"><b class="num">'+dmy(r.date)+' · '+nf(r.pct,0)+' %</b>'+(r.ex?'<span class="muted small">Ejemplo</span>':'')+'</div><button type="button" class="x" data-rmr="'+esc(r.id)+'" aria-label="Borrar lectura">×</button></div>'}).join('')+'</div>':'')+'</section>';
+   +(S.reads.length?'<div>'+S.reads.slice().sort(function(a,b){return a.date<b.date?1:-1}).map(function(r){return '<div class="rowl"><div class="t"><b class="num">'+dmy(r.date)+' · '+nf(r.pct,0)+' %</b>'+(r.ex?'<span class="muted small">Ejemplo</span>':'')+'</div><button type="button" class="x" data-rmr="'+esc(r.id)+'" aria-label="Borrar lectura">×</button></div>'}).join('')+'</div>':'')+'</details></section>';
   var tips=[];
   if(hb.n){
     if(hb.dcShare>30)tips.push('Más del '+nf(hb.dcShare,0)+' % de tu energía reciente viene de carga rápida. Suele convenir reservarla para viajes y cargar en casa a diario.');
@@ -668,6 +716,7 @@ function viewBateria(){
   html+='<section class="card"><h3>Informe para vender o enseñar</h3><p class="muted small">Resumen con la salud estimada, el periodo de datos y tus hábitos de carga.</p><div class="grid2"><button class="btn ghost" id="rpCopy" type="button">Copiar resumen</button><button class="btn ghost" id="rpSave" type="button">Guardar informe</button></div></section>';
   html+='<section class="card plain"><h3>Cómo se calcula</h3><p class="small muted">Con cada carga de 30 puntos de batería o más, divido la energía que entró en la batería entre el porcentaje cargado. La energía sale de los kWh anotados menos las pérdidas de carga que fijas en Ajustes. Se compara con la capacidad útil de fábrica. El porcentaje de batería del coche no es exacto, por eso conviene mirar la tendencia y no una sola carga. Muchos fabricantes garantizan alrededor del 70 % durante varios años: comprueba las condiciones de tu contrato.</p></section>';
   return {html:html,bind:function(){
+    quickChargeBind();
     $('#rdForm').addEventListener('submit',function(e){
       e.preventDefault();var pct=num($('#rdPct').value,0);
       if(pct<40||pct>110){toast('Indica un porcentaje entre 40 y 110');return}
@@ -679,10 +728,84 @@ function viewBateria(){
   }};
 }
 
+
+/* ---------- AUTONOMÍA REAL Y CALIDAD DE LA ESTIMACIÓN ---------- */
+function rangeStats(){
+  var L=S.log.filter(function(l){return l.odo>0}).sort(function(a,b){return a.odo-b.odo}),pts=[];
+  for(var i=1;i<L.length;i++){
+    var km=L[i].odo-L[i-1].odo,used=L[i-1].to-L[i].from;
+    if(km>=20&&km<=900&&used>=15&&used<=95)pts.push({date:L[i].date,km:km,used:used,range:km/used*100,cons:(used/100*capNow())/km*100});
+  }
+  var use=pts.slice(-8);
+  if(!use.length)return {n:0,pts:pts};
+  var r=use.map(function(p){return p.range}),c=use.map(function(p){return p.cons});
+  return {n:use.length,pts:pts,range:median(r),lo:Math.min.apply(null,r),hi:Math.max.apply(null,r),cons:median(c)};
+}
+function lastFullDays(){
+  var d=null;S.log.forEach(function(l){if(l.to>=99&&(d===null||l.date>d))d=l.date});
+  return d?Math.round((Date.now()-parseD(d).getTime())/864e5):null;
+}
+function rangeCardHTML(){
+  var r=rangeStats(),ref=num(S.car.range,0);
+  var h='<section class="card"><h3>Autonomía real</h3>';
+  if(!r.n)return h+'<p class="muted small">Para calcularla, anota el <b>odómetro</b> en tus cargas (en la sección Cargas o en el formulario de arriba). Con los kilómetros entre una carga y la siguiente y los puntos de batería que has gastado, la app calcula cuántos kilómetros te da el 100 %.</p></section>';
+  h+='<div class="grid2">'+kv(nf(r.range,0)+' km','Con el 100 % de batería')+kv(nf(r.cons,1)+' kWh/100 km','Consumo real')+'</div>';
+  if(ref>0)h+='<p>Es el <b>'+nf(r.range/ref*100,0)+' %</b> de la autonomía de fábrica ('+nf(ref)+' km). Depende de cómo conduces y del clima: no es lo mismo que la salud de la batería.</p>';
+  else h+='<p class="muted small">Añade la autonomía de fábrica en Coche, Ficha para compararla.</p>';
+  h+='<p class="muted small">Sale de '+r.n+' tramos entre cargas (rango '+nf(r.lo,0)+'–'+nf(r.hi,0)+' km). Solo es fiable si registras <b>todas</b> las cargas entre un odómetro y el siguiente; el frío, la velocidad y las pendientes la mueven mucho.</p></section>';
+  return h;
+}
+function qualityHTML(){
+  var h=sohSummary(),fd=lastFullDays(),flags=[];
+  if(h.n<2)flags.push('Necesito al menos 2 cargas largas (de 30 puntos o más) para estimar la salud. Lo ideal es una carga de entre el 10–20 % y el 100 %.');
+  if(h.basis==='calc'&&h.hi-h.lo>6)flags.push('Tus estimaciones varían '+nf(h.hi-h.lo,0)+' puntos entre unas cargas y otras. Puede ser que el BMS no esté bien calibrado: el porcentaje que muestra el coche deja de ser exacto.');
+  if(fd===null)flags.push('No tienes ninguna carga al 100 % registrada. Sin cargas completas la estimación es menos fiable.');
+  else if(fd>60)flags.push('Hace '+fd+' días que no cargas al 100 %. Una carga completa de vez en cuando ayuda al BMS a ajustar el porcentaje.');
+  var steps='<ol style="margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px"><li>Carga hasta el <b>100 %</b> y deja el coche conectado hasta que el cargador termine del todo (a veces una o dos horas más, mientras equilibra las celdas).</li><li>Conduce con normalidad hasta bajar a un nivel bajo, en torno al <b>10–20 %</b>. No lo dejes por debajo del 5 %.</li><li>Vuelve a cargar hasta el <b>100 %</b> sin interrumpir la carga. Apunta el % de inicio y de fin, los kWh del cargador y el odómetro.</li><li>Esa carga de 10–20 % a 100 % es la más fiable para estimar la salud.</li></ol><p class="muted small" style="margin-top:8px">Es una pauta general: los pasos exactos dependen del fabricante, así que mira el manual. Si tu batería es LFP suelen recomendar cargar al 100 % con regularidad; en otras químicas, hazlo solo de vez en cuando, no a diario.</p>';
+  return '<section class="card"><h3>Fiabilidad y calibración del BMS</h3>'
+   +'<div class="note">La app calcula la salud a partir de los kWh que entran, los puntos de batería que cargas y, si lo pones, el odómetro. <b>No necesitas introducir la salud.</b> Pero el porcentaje del coche lo da el BMS, y si está descalibrado el resultado puede salir más alto o más bajo de lo real.</div>'
+   +flags.map(function(f){return '<div class="note warn">'+f+'</div>'}).join('')
+   +'<details class="tbl"'+(flags.length?' open':'')+'><summary>Cómo calibrar el BMS</summary>'+steps+'</details></section>';
+}
+
+
+/* ---------- REGISTRO RÁPIDO DE CARGA (en Batería) ---------- */
+var BC={type:'casa'};
+function quickChargeHTML(){
+  return '<section class="card" id="qcCard"><h3>Registrar una carga</h3><p class="muted small">Con estos datos la app calcula sola la salud de la batería y la autonomía real. Los kWh los ves en el cargador, la app del cargador o el contador.</p>'
+   +'<form id="qcForm" style="display:flex;flex-direction:column;gap:10px">'+seg([['casa','Casa'],['ac','Pública lenta'],['dc','Pública rápida']],BC.type,'qcType')
+   +'<div class="grid2">'+fld('qDate','Fecha',iso(new Date()),{type:'date'})+fld('qKwh','Energía cargada',30,{unit:'kWh',min:0})+fld('qFrom','Batería al empezar',20,{unit:'%',min:0,max:100})+fld('qTo','Batería al acabar',100,{unit:'%',min:1,max:100})+'</div>'
+   +fld('qOdo','Kilómetros del coche (odómetro)','',{unit:'km',min:0})
+   +fld('qCost','Importe (opcional)','',{unit:'€',min:0})
+   +'<p class="muted small" id="qHint"></p><button class="btn" type="submit">Guardar carga</button></form></section>';
+}
+function quickChargeBind(){
+  onSeg($('#qcType'),function(v){BC.type=v;render()});
+  var hint=function(){
+    var k=num($('#qKwh').value),f=num($('#qFrom').value),t=num($('#qTo').value),d=t-f,el=$('#qHint');if(!el)return;
+    if(!(d>0)||!(k>0)){el.textContent='Indica los kWh y el porcentaje de inicio y de fin.';return}
+    if(d<30){el.textContent='Con menos de 30 puntos de diferencia no se usa para estimar la salud, pero sí cuenta como carga. Lo ideal es de 10–20 % a 100 %.';return}
+    var cap=k*(S.eff[BC.type]||0.9)/(d/100),soh=cap/S.car.nominal*100;
+    el.textContent=(soh<40||soh>115)?'Esta carga da un resultado fuera de lo normal ('+nf(soh,0)+' %): revisa los kWh y los porcentajes. No se usará para la salud.':'Con esta carga la batería saldría con unos '+nf(cap,1)+' kWh útiles, un '+nf(soh,0)+' % de la capacidad de fábrica. Es una estimación.';
+  };
+  ['qKwh','qFrom','qTo'].forEach(function(id){$('#'+id).addEventListener('input',hint)});hint();
+  $('#qcForm').addEventListener('submit',function(e){
+    e.preventDefault();
+    var k=num($('#qKwh').value),f=num($('#qFrom').value),t=num($('#qTo').value),odo=num($('#qOdo').value),c=$('#qCost').value.trim()===''?null:num($('#qCost').value);
+    if(!(k>0)){toast('Indica la energía cargada');return}
+    if(!(t>f)){toast('La batería final debe ser mayor que la inicial');return}
+    var est=false;if(c===null){c=round(k*(S.price[BC.type]||0.3),2);est=true}
+    S.log.push({id:uid(),date:$('#qDate').value||iso(new Date()),type:BC.type,place:'',from:f,to:t,kwh:k,cost:c,odo:odo>0?odo:0});
+    save();render();toast('Carga guardada'+(est?' (importe estimado con tu precio habitual)':'')+((t-f)>=30?'. Salud recalculada.':'.'));
+  });
+}
+
 /* ---------- CARGAS ---------- */
-var CF={type:'casa'};
+var CF={type:'casa',edit:null};
 var TYPES={casa:'Casa',ac:'Pública lenta',dc:'Pública rápida'};
 function viewCargas(){
+  var ED=CF.edit?S.log.filter(function(l){return l.id===CF.edit})[0]:null;if(CF.edit&&!ED)CF.edit=null;
+  if(ED)CF.type=ED.type;
   var ms=monthSeries(),c=consStats(),sorted=S.log.slice().sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0)});
   var tot=S.log.reduce(function(a,l){return a+l.cost},0),totK=S.log.reduce(function(a,l){return a+l.kwh},0);
   var html='<section class="card"><div class="head"><h2>Registro de cargas</h2><span class="muted small">'+S.log.length+' cargas</span></div><div class="grid2">'
@@ -693,17 +816,17 @@ function viewCargas(){
    +ms.map(function(m){return '<tr><td>'+esc(m.label)+'</td><td>'+eur(m.casa)+'</td><td>'+eur(m.ac)+'</td><td>'+eur(m.dc)+'</td><td>'+eur(m.total)+'</td></tr>'}).join('')+'</tbody></table></div></details></section>'
    +'<section class="card"><h3>Qué te sale más barato</h3>'+typeCostsHTML()+'</section>'
    +'<section class="card"><h3>Resumen del año</h3>'+yearHTML()+'</section>'
-   +'<section class="card"><h3>Añadir carga</h3><form id="lgForm" style="display:flex;flex-direction:column;gap:10px">'
+   +'<section class="card" id="lgCard"><h3>'+(ED?'Editar carga':'Añadir carga')+'</h3><form id="lgForm" style="display:flex;flex-direction:column;gap:10px">'
    +seg([['casa','Casa'],['ac','Pública lenta'],['dc','Pública rápida']],CF.type,'cfType')
-   +'<div class="grid2">'+fld('cDate','Fecha',iso(new Date()),{type:'date'})+fld('cPlace','Lugar u operador','',{type:'text'})
-   +fld('cFrom','Batería al empezar',20,{unit:'%',min:0,max:100})+fld('cTo','Batería al acabar',80,{unit:'%',min:1,max:100})
-   +fld('cKwh','Energía',30,{unit:'kWh',min:0})+fld('cCost','Importe',3.3,{unit:'€',min:0})+'</div>'
-   +fld('cOdo','Odómetro (opcional)','',{unit:'km',min:0})
-   +'<p class="muted small" id="cHint"></p><button class="btn" type="submit">Guardar carga</button></form></section>'
+   +'<div class="grid2">'+fld('cDate','Fecha',ED?ED.date:iso(new Date()),{type:'date'})+fld('cPlace','Lugar u operador',ED?ED.place||'':'',{type:'text'})
+   +fld('cFrom','Batería al empezar',ED?ED.from:20,{unit:'%',min:0,max:100})+fld('cTo','Batería al acabar',ED?ED.to:80,{unit:'%',min:1,max:100})
+   +fld('cKwh','Energía',ED?ED.kwh:30,{unit:'kWh',min:0})+fld('cCost','Importe',ED?ED.cost:3.3,{unit:'€',min:0})+'</div>'
+   +fld('cOdo','Odómetro (opcional)',ED&&ED.odo?ED.odo:'',{unit:'km',min:0})
+   +'<p class="muted small" id="cHint"></p><button class="btn" type="submit">'+(ED?'Guardar cambios':'Guardar carga')+'</button>'+(ED?'<button class="btn ghost" id="cCancel" type="button">Cancelar</button>':'')+'</form></section>'
    +'<section class="card"><div class="head"><h3>Historial</h3>'+(S.log.some(function(l){return l.ex})?'<button class="btn ghost sm" id="clearEx" type="button">Quitar ejemplos</button>':'')+'</div>'
    +(sorted.length?sorted.map(function(l){
       var d=l.to-l.from;
-      return '<div class="rowl"><div class="t"><b class="num">'+dmy(l.date)+' · '+nf(l.kwh,1)+' kWh · '+eur(l.cost)+'</b><span class="muted small">'+TYPES[l.type]+(l.place?' · '+esc(l.place):'')+' · '+l.from+' → '+l.to+' %'+(l.odo?' · '+nf(l.odo)+' km':'')+(l.ex?' · ejemplo':'')+(d>=30?'':' · no sirve para la salud')+'</span></div><button type="button" class="x" data-rm="'+esc(l.id)+'" aria-label="Borrar carga">×</button></div>';
+      return '<div class="rowl"><div class="t"><b class="num">'+dmy(l.date)+' · '+nf(l.kwh,1)+' kWh · '+eur(l.cost)+'</b><span class="muted small">'+TYPES[l.type]+(l.place?' · '+esc(l.place):'')+' · '+l.from+' → '+l.to+' %'+(l.odo?' · '+nf(l.odo)+' km':'')+(l.ex?' · ejemplo':'')+(d>=30?'':' · no sirve para la salud')+'</span></div><span style="display:flex;gap:6px;align-items:center"><button type="button" class="btn ghost sm" data-edl="'+esc(l.id)+'">Editar</button><button type="button" class="x" data-rm="'+esc(l.id)+'" aria-label="Borrar carga">×</button></span></div>';
     }).join(''):'<p class="muted">Todavía no hay cargas. Guarda la primera con el formulario de arriba.</p>')+'</section>';
   return {html:html,bind:function(){
     onSeg($('#cfType'),function(v){CF.type=v;render()});
@@ -721,10 +844,13 @@ function viewCargas(){
       var kwh=num($('#cKwh').value),cost=num($('#cCost').value),f=num($('#cFrom').value),t=num($('#cTo').value),odo=num($('#cOdo').value);
       if(kwh<=0){toast('Indica la energía cargada');return}
       if(!(t>f)){toast('La batería final debe ser mayor que la inicial');return}
+      if(ED){ED.date=$('#cDate').value||ED.date;ED.type=CF.type;ED.place=$('#cPlace').value.trim();ED.from=f;ED.to=t;ED.kwh=kwh;ED.cost=cost;ED.odo=odo>0?odo:0;delete ED.ex;CF.edit=null;save();render();toast('Carga actualizada');return}
       S.log.push({id:uid(),date:$('#cDate').value||iso(new Date()),type:CF.type,place:$('#cPlace').value.trim(),from:f,to:t,kwh:kwh,cost:cost,odo:odo>0?odo:0});
       save();render();toast('Carga guardada');
     });
-    $$('[data-rm]').forEach(function(b){b.addEventListener('click',function(){S.log=S.log.filter(function(l){return l.id!==b.dataset.rm});save();render()})});
+    $$('[data-rm]').forEach(function(b){b.addEventListener('click',function(){S.log=S.log.filter(function(l){return l.id!==b.dataset.rm});if(CF.edit===b.dataset.rm)CF.edit=null;save();render()})});
+    $$('[data-edl]').forEach(function(b){b.addEventListener('click',function(){CF.edit=b.dataset.edl;render();var c=$('#lgCard');if(c&&c.scrollIntoView)c.scrollIntoView({behavior:'smooth',block:'start'})})});
+    var cc=$('#cCancel');if(cc)cc.addEventListener('click',function(){CF.edit=null;render()});
     var ce=$('#clearEx');if(ce)ce.addEventListener('click',function(){S.log=S.log.filter(function(l){return !l.ex});S.reads=S.reads.filter(function(r){return !r.ex});save();render();toast('Ejemplos quitados')});
   }};
 }
@@ -847,15 +973,33 @@ function viajeView(){
 
 /* ---------- MAPA DE CARGADORES GRATIS (solo versión alojada) ---------- */
 var HOSTED=(typeof window.claude==='undefined');
-var G={pts:[],sel:null,all:false,map:null,group:null,tok:0,timer:null,view:{lat:40.4168,lon:-3.7038,z:11},status:'',statusCls:''};
+var G={pts:[],sel:null,all:true,map:null,group:null,tok:0,timer:null,view:{lat:40.4168,lon:-3.7038,z:11},status:'',statusCls:''};
 var OCMKEY='vatio.ocm';
-function getKey(){try{return (localStorage.getItem(OCMKEY)||'').trim()}catch(e){return ''}}
+function getKey(){
+  try{
+    var k=(localStorage.getItem(OCMKEY)||'').trim();
+    if(!k){var o=JSON.parse(localStorage.getItem('enchufa.v2')||'null');var ok=o&&o.keys&&o.keys.ocm;if(ok&&String(ok).trim()){k=String(ok).trim();localStorage.setItem(OCMKEY,k)}}
+    return k;
+  }catch(e){return ''}
+}
 function setKey(v){try{localStorage.setItem(OCMKEY,String(v||'').trim())}catch(e){}}
 function hav(a,b,c,d){var R=6371,p=Math.PI/180,x=(c-a)*p,y=(d-b)*p;var q=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*p)*Math.cos(c*p)*Math.sin(y/2)*Math.sin(y/2);return 2*R*Math.asin(Math.sqrt(q))}
 function jget(url,ms){
   var ctl=('AbortController' in window)?new AbortController():null;
   var to=setTimeout(function(){if(ctl)ctl.abort()},ms||20000);
   return fetch(url,ctl?{signal:ctl.signal}:{}).then(function(r){clearTimeout(to);if(!r.ok)throw new Error('error '+r.status);return r.json()},function(e){clearTimeout(to);throw e});
+}
+var FREE_RE=/\b(free|gratis|gratuit[oa]s?|gratuït|sin coste|sin cargo|sin costo|no cost|kostenlos|free of charge|libre de coste)\b|(^|[^\d.,])0([.,]0+)?\s*(€|eur|euro)|^\s*(€|eur)\s*0([.,]0+)?\s*$/i;
+var NOTFREE_RE=/\b(not free|no gratis|no es gratis|non[- ]free)\b/i;
+var MAYBE_RE=/lidl|ikea|carrefour|corte ingl[eé]s|ahorram[aá]s|mcdonald|burger king|starbucks|hotel|parador|aeropuerto|airport|aena|ayuntamiento|universidad|biblioteca|centro comercial|hipermercado|mercadona|alcampo|eroski|supermercado/i;
+var PAID_RE=/decathlon|leroy|costco|iberdrola|endesa|repsol|ionity|zunder|tesla|supercharger|wenea|powerdot|pulsing|cepsa|moeve|plenitude|shell recharge|fastned/i;
+function isFreeCost(c){c=String(c||'');return !NOTFREE_RE.test(c)&&FREE_RE.test(c)}
+function classify(p){
+  if(p.free)return 'free';
+  var hasPrice=/\d/.test(p.cost)||/€|eur|kwh|tarifa|pago|pay/i.test(p.cost);
+  var txt=p.n+' '+p.op+' '+p.addr;
+  if(!hasPrice&&MAYBE_RE.test(txt)&&!PAID_RE.test(p.op+' '+p.n))return 'maybe';
+  return 'other';
 }
 function normOCM(p){
   if(!p||!p.AddressInfo)return null;
@@ -866,50 +1010,60 @@ function normOCM(p){
   var lat=parseFloat(a.Latitude),lon=parseFloat(a.Longitude);
   if(!isFinite(lat)||!isFinite(lon)||(lat===0&&lon===0))return null;
   return {id:'o'+p.ID,n:a.Title||'Punto de carga',lat:lat,lon:lon,kw:kw,conn:cs,cost:cost,
-    free:/\b(free|gratis|gratuito|gratuita|sin coste|sin cargo)\b/i.test(cost)&&!/\b(not free|no gratis|no es gratis)\b/i.test(cost),
+    free:isFreeCost(cost),cls:'other',
     s:st,addr:[a.AddressLine1,a.Town].filter(Boolean).join(', '),op:(p.OperatorInfo&&p.OperatorInfo.Title)||'',upd:String(p.DateLastVerified||p.DateLastStatusUpdate||'').slice(0,10),np:p.NumberOfPoints||0};
 }
-function gShown(){return G.pts.filter(function(p){return G.all||p.free}).sort(function(a,b){return hav(G.view.lat,G.view.lon,a.lat,a.lon)-hav(G.view.lat,G.view.lon,b.lat,b.lon)})}
+function normPOI(p){var q=normOCM(p);if(q)q.cls=classify(q);return q}
+function gShown(){return G.pts.filter(function(p){return G.all||p.cls!=='other'}).sort(function(a,b){return hav(G.view.lat,G.view.lon,a.lat,a.lon)-hav(G.view.lat,G.view.lon,b.lat,b.lon)})}
+function gDiag(extra){
+  if(extra!==undefined)G.diag=extra;
+  var el=$('#gdiag');if(!el)return;
+  var k=getKey();
+  el.textContent='Diagnóstico: mapa '+(typeof L!=='undefined'&&L.map?'cargado':'NO cargado')+' · clave '+(k?'guardada ('+k.length+' caracteres)':'sin guardar')+' · '+(G.diag||'sin consultas todavía')+'.';
+}
 function gStatus(msg,cls){G.status=msg;G.statusCls=cls||'';var el=$('#gstatus');if(el){el.hidden=!msg;el.className='note'+(cls?' '+cls:'');el.textContent=msg}}
 function gLoad(){
-  if(!G.map)return;
   var key=getKey();
   if(!key){G.pts=[];gDraw();gStatus('Pega tu clave gratuita de Open Charge Map para ver los cargadores reales.','warn');return}
-  var c=G.map.getCenter(),b=G.map.getBounds();
-  if(G.map.getZoom()<9){gStatus('Acerca el mapa para ver los cargadores de la zona.','');return}
-  var rad=clamp(Math.max(hav(c.lat,c.lng,b.getNorth(),c.lng),hav(c.lat,c.lng,c.lat,b.getEast())),3,60);
+  var c,rad;
+  if(G.map){
+    c=G.map.getCenter();var b=G.map.getBounds();
+    if(G.map.getZoom()<9){gStatus('Acerca el mapa para ver los cargadores de la zona.','');return}
+    rad=clamp(Math.max(hav(c.lat,c.lng,b.getNorth(),c.lng),hav(c.lat,c.lng,c.lat,b.getEast())),3,60);
+  }else{c={lat:G.view.lat,lng:G.view.lon};rad=15}
   var tok=++G.tok;gStatus('Buscando cargadores…','ok');
-  var q='?output=json&latitude='+c.lat.toFixed(5)+'&longitude='+c.lng.toFixed(5)+'&distance='+Math.round(rad)+'&distanceunit=KM&maxresults=500&compact=false&verbose=false&countrycode=ES&key='+encodeURIComponent(key);
-  jget('https://api.openchargemap.io/v3/poi'+q,25000).then(function(arr){
+  var q='?output=json&latitude='+c.lat.toFixed(5)+'&longitude='+c.lng.toFixed(5)+'&distance='+Math.round(rad)+'&distanceunit=KM&maxresults=400&compact=false&verbose=false&key='+encodeURIComponent(key);
+  jget('https://api.openchargemap.io/v3/poi'+q,30000).then(function(arr){
     if(tok!==G.tok)return;
     if(!Array.isArray(arr))throw new Error('respuesta no válida');
-    G.pts=arr.map(normOCM).filter(Boolean);
-    var f=G.pts.filter(function(p){return p.free}).length;
-    gStatus(f?'':'No hay puntos marcados como gratis en esta zona ('+G.pts.length+' cargadores en total). En Open Charge Map el precio lo rellena la comunidad, así que muchos gratuitos no están marcados.','');
+    G.pts=arr.map(normPOI).filter(Boolean);gDiag('última respuesta correcta con '+arr.length+' puntos');
+    var f=G.pts.filter(function(p){return p.cls==='free'}).length,m=G.pts.filter(function(p){return p.cls==='maybe'}).length;
+    gStatus(G.pts.length?G.pts.length+' cargadores en la zona: '+f+' marcados como gratis y '+m+' posibles. En Open Charge Map el precio lo rellena la comunidad y casi siempre está vacío, así que muchos gratuitos no aparecen marcados.':'Open Charge Map no devuelve cargadores en esta zona. Acércate a una ciudad o revisa tu clave.',G.pts.length?'':'warn');
     gDraw();
   },function(e){
     if(tok!==G.tok)return;
-    gStatus('No se pudieron cargar los cargadores ('+(e&&e.message?e.message:'sin conexión')+'). Revisa tu clave y tu conexión.','bad');
+    gDiag('última consulta fallida: '+(e&&e.message?e.message:'sin conexión'));
+    gStatus(/40[13]/.test(e&&e.message||'')?'La clave de Open Charge Map no es válida. Cópiala de nuevo en el campo de arriba.':'No se pudieron cargar los cargadores ('+(e&&e.message?e.message:'sin conexión')+'). Revisa tu conexión.','bad');
   });
 }
-function gIcon(p){return L.divIcon({className:'gpw',html:'<span class="gp '+(p.free?'free':'off')+(G.sel===p.id?' sel':'')+'"></span>',iconSize:[26,26],iconAnchor:[13,13]})}
+function gIcon(p){return L.divIcon({className:'gpw',html:'<span class="gp '+(p.cls==='free'?'free':(p.cls==='maybe'?'maybe':'off'))+(G.sel===p.id?' sel':'')+'"></span>',iconSize:[26,26],iconAnchor:[13,13]})}
 function gDraw(){
   var list=gShown();
   if(G.sel&&!list.some(function(p){return p.id===G.sel}))G.sel=null;
-  if(G.group){G.group.clearLayers();list.slice(0,300).forEach(function(p){var m=L.marker([p.lat,p.lon],{icon:gIcon(p),title:p.n,keyboard:true});m.on('click',function(){gSelect(p.id)});m.addTo(G.group)})}
+  if(G.group&&typeof L!=='undefined'){G.group.clearLayers();list.slice(0,300).forEach(function(p){var m=L.marker([p.lat,p.lon],{icon:gIcon(p),title:p.n,keyboard:true});m.on('click',function(){gSelect(p.id)});m.addTo(G.group)})}
   var d=$('#gdetail');if(d){d.innerHTML=gDetail();d.hidden=!G.sel;bindDetail()}
   var l=$('#glist');
   if(l){
     l.innerHTML=list.length?list.slice(0,25).map(function(p){var st=p.s==='operativo'?['ok','Operativo']:p.s==='fuera'?['bad','Fuera de servicio']:['warn','Sin dato'];
-      return '<div class="rowl"><button type="button" class="rowbtn" data-gid="'+esc(p.id)+'"><span class="t"><b>'+esc(p.n)+'</b><span class="muted small">'+(p.kw?nf(p.kw)+' kW · ':'')+esc(p.conn.join(', ')||'conector sin dato')+' · '+nf(hav(G.view.lat,G.view.lon,p.lat,p.lon),1)+' km'+(p.free?'':' · de pago o sin dato')+'</span></span></button><span class="pill '+st[0]+'">'+st[1]+'</span></div>'}).join(''):'<p class="muted small">No hay nada que mostrar aquí. Mueve el mapa o activa «Mostrar todos».</p>';
+      return '<div class="rowl"><button type="button" class="rowbtn" data-gid="'+esc(p.id)+'"><span class="t"><b>'+esc(p.n)+'</b><span class="muted small">'+(p.kw?nf(p.kw)+' kW · ':'')+esc(p.conn.join(', ')||'conector sin dato')+' · '+nf(hav(G.view.lat,G.view.lon,p.lat,p.lon),1)+' km'+(p.cls==='free'?' · gratis':(p.cls==='maybe'?' · posible gratis':' · de pago o sin dato'))+'</span></span></button><span class="pill '+st[0]+'">'+st[1]+'</span></div>'}).join(''):'<p class="muted small">No hay nada que mostrar aquí. Mueve el mapa o activa «Mostrar todos».</p>';
     $$('.rowbtn',l).forEach(function(b){b.addEventListener('click',function(){gSelect(b.dataset.gid,true)})});
   }
-  var n=$('#gcount');if(n)n.textContent=list.length+' '+(G.all?'puntos':'gratis');
+  var n=$('#gcount');if(n)n.textContent=list.length+' '+(G.all?'puntos':'gratis y posibles');
 }
 function gDetail(){
   var p=G.pts.filter(function(x){return x.id===G.sel})[0];if(!p)return '';
   return '<b>'+esc(p.n)+'</b><span class="muted small">'+esc(p.addr||'Sin dirección')+(p.op?' · '+esc(p.op):'')+'</span>'
-   +'<span class="small">'+(p.free?'Marcado como gratis':'Precio: '+(p.cost?esc(p.cost):'sin dato'))+(p.cost&&p.free?' · «'+esc(p.cost)+'»':'')+' · '+(p.kw?nf(p.kw)+' kW':'potencia sin dato')+(p.np?' · '+p.np+' puntos':'')+'</span>'
+   +'<span class="small">'+(p.cls==='free'?'Marcado como gratis':(p.cls==='maybe'?'Posible gratis: sitio de comercio o clientes sin precio indicado. Suele ser gratis para clientes':'Precio: '+(p.cost?esc(p.cost):'sin dato')))+(p.cost&&p.cls==='free'?' · «'+esc(p.cost)+'»':'')+' · '+(p.kw?nf(p.kw)+' kW':'potencia sin dato')+(p.np?' · '+p.np+' puntos':'')+'</span>'
    +'<span class="muted small">Dato de la comunidad'+(p.upd?', verificado el '+dmy(p.upd):', sin fecha de verificación')+'. Confírmalo antes de ir.</span>'
    +'<div class="grid2"><a class="btn sm" href="https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon+'" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Cómo llegar</a><button class="btn ghost sm" id="gSave" type="button">Guardar en mis sitios</button></div>';
 }
@@ -927,25 +1081,34 @@ function gSelect(id,pan){
   if(pan&&p&&G.map)G.map.setView([p.lat,p.lon],Math.max(G.map.getZoom(),14));
   var d=$('#gdetail');if(d&&d.scrollIntoView)d.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
-function gGo(lat,lon,z){if(G.map)G.map.setView([lat,lon],z||13)}
+function gGo(lat,lon,z){if(G.map)G.map.setView([lat,lon],z||13);else{G.view={lat:lat,lon:lon,z:z||13};gLoad()}}
 function mapHTML(){
-  if(!HOSTED)return '<section class="card hero"><h2>Cargadores gratis cerca de ti</h2><p class="muted">El mapa en vivo necesita la versión instalable de Vatio, porque esta ventana no puede consultar servicios externos. Mientras tanto tienes abajo la guía de sitios que suelen ser gratis y tu lista propia.</p></section>';
+  if(!HOSTED)return '<section class="card hero"><h2>Cargadores gratis cerca de ti</h2><div class="note warn">Estás usando Vatio dentro de Claude. Aquí el mapa y la lista en vivo no pueden funcionar porque esta ventana bloquea las consultas a Internet. No es un fallo de tu clave. Para verlos abre la versión instalable (la que subes a GitHub Pages o Netlify) y pega ahí tu clave de Open Charge Map.</div><p class="muted small">Mientras tanto, abre estos mapas con un toque:</p><div class="grid2"><a class="btn sm" href="https://www.electromaps.com/puntos-de-carga" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Electromaps</a><a class="btn sm" href="https://www.plugshare.com/" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">PlugShare</a><a class="btn sm" href="https://map.openchargemap.io/" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Open Charge Map</a><a class="btn sm" href="https://www.google.com/maps/search/cargador+coche+el%C3%A9ctrico+gratis" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Google Maps</a></div></section>';
   var key=getKey();
   return '<section class="card hero"><h2>Cargadores gratis cerca de ti</h2><p class="muted small">Datos de Open Charge Map, una base abierta mantenida por la comunidad. Solo se marcan como gratis los puntos cuyo precio lo dice así.</p>'
    +(key?'':'<div class="note warn">Falta tu clave gratuita de Open Charge Map. Créala en <a class="link" href="https://openchargemap.org/site/develop/api" target="_blank" rel="noopener">openchargemap.org</a> (en el apartado para desarrolladores de tu cuenta) y pégala aquí. Se guarda solo en este dispositivo.</div>')
-   +fld('gK','Clave de Open Charge Map',key,{type:'text',data:'placeholder="Pega aquí tu clave"'})+'</section>'
+   +fld('gK','Clave de Open Charge Map',key,{type:'text',data:'placeholder="Pega aquí tu clave"'})+'<button class="btn" id="gKs" type="button">Guardar clave y buscar</button></section>'
    +'<section class="card"><div class="mapbar"><input id="gQ" type="text" placeholder="Ciudad o dirección" autocomplete="off" aria-label="Buscar un lugar"><button class="btn sm" id="gS" type="button">Buscar</button><button class="btn ghost sm" id="gM" type="button">Mi ubicación</button></div>'
-   +'<div class="chips"><button type="button" class="chip'+(G.all?'':' on')+'" id="gOnly">Solo gratis</button><button type="button" class="chip'+(G.all?' on':'')+'" id="gAll">Mostrar todos</button><span class="muted small" id="gcount" style="align-self:center;margin-left:auto"></span></div>'
+   +'<div class="chips"><button type="button" class="chip'+(G.all?'':' on')+'" id="gOnly">Solo gratis y posibles</button><button type="button" class="chip'+(G.all?' on':'')+'" id="gAll">Todos</button><span class="muted small" id="gcount" style="align-self:center;margin-left:auto"></span></div>'
    +'<div id="gmap" role="application" aria-label="Mapa de cargadores"></div>'
-   +'<p class="note" id="gstatus" hidden></p>'
-   +'<div class="legend"><span><i class="circ" style="background:var(--accent)"></i>Gratis</span><span><i class="circ" style="background:var(--surface);border:2px solid var(--muted)"></i>De pago o sin dato</span></div>'
+   +'<p class="note" id="gstatus" hidden></p><p class="muted small" id="gdiag"></p>'
+   +'<div class="legend"><span><i class="circ" style="background:var(--accent)"></i>Gratis</span><span><i class="circ" style="background:var(--surface);border:2px solid var(--accent)"></i>Posible gratis</span><span><i class="circ" style="background:var(--surface);border:2px solid var(--muted)"></i>De pago o sin dato</span></div>'
    +'<div class="kv" id="gdetail" hidden style="gap:6px"></div></section>'
    +'<section class="card"><h3>Más cerca del centro del mapa</h3><div id="glist"></div></section>';
 }
 function mapBind(){
   if(!HOSTED)return;
-  var k=$('#gK');if(k)k.addEventListener('change',function(){setKey(k.value);render()});
-  if(typeof L==='undefined'||!L.map){gStatus('No se pudo cargar el mapa. Comprueba tu conexión.','bad');return}
+  var k=$('#gK');if(k){k.addEventListener('input',function(){setKey(k.value)});k.addEventListener('change',function(){setKey(k.value);render()});var kb=$('#gKs');if(kb)kb.addEventListener('click',function(){setKey(k.value);if(!getKey()){toast('Pega primero tu clave');return}toast('Clave guardada');render()})}
+  if(typeof L==='undefined'||!L.map){
+    G.map=null;var gm=$('#gmap');if(gm)gm.hidden=true;
+    $('#gOnly').addEventListener('click',function(){G.all=false;render()});
+    $('#gAll').addEventListener('click',function(){G.all=true;render()});
+    $('#gS').addEventListener('click',function(){var q=$('#gQ').value.trim();if(!q)return;gStatus('Buscando…','ok');
+      jget('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=es&q='+encodeURIComponent(q),15000).then(function(r){if(r&&r[0])gGo(num(r[0].lat),num(r[0].lon),13);else gStatus('No encuentro ese lugar.','warn')},function(){gStatus('No se pudo buscar ese lugar.','bad')})});
+    $('#gQ').addEventListener('keydown',function(e){if(e.key==='Enter')$('#gS').click()});
+    $('#gM').addEventListener('click',function(){if(!navigator.geolocation){gStatus('Tu navegador no da la ubicación.','warn');return}
+      navigator.geolocation.getCurrentPosition(function(p){gGo(p.coords.latitude,p.coords.longitude,13)},function(){gStatus('No pude obtener tu ubicación. Escribe una ciudad.','warn')},{timeout:10000})});
+    gDiag();gDraw();gLoad();return}
   if(G.map){try{G.map.remove()}catch(e){}G.map=null}
   G.map=L.map('gmap',{zoomControl:true,attributionControl:true}).setView([G.view.lat,G.view.lon],G.view.z);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}).addTo(G.map);
@@ -965,7 +1128,8 @@ function mapBind(){
     if(!navigator.geolocation){gStatus('Tu navegador no da la ubicación.','warn');return}
     navigator.geolocation.getCurrentPosition(function(p){gGo(p.coords.latitude,p.coords.longitude,13)},function(){gStatus('No pude obtener tu ubicación. Escribe una ciudad.','warn')},{timeout:10000});
   });
-  gDraw();gLoad();
+  gDiag();gDraw();gLoad();
+  setTimeout(function(){try{G.map.invalidateSize()}catch(e){}},450);
 }
 function viewGratis(){
   var g=gratisView();
@@ -1059,9 +1223,7 @@ function viewTarifas(){
 /* ---------- AJUSTES ---------- */
 var resetArm=false;
 function viewAjustes(){
-  var html='<section class="card"><h2>Tu coche</h2>'+fld('aN','Nombre',S.car.name,{type:'text'})
-   +'<div class="grid2">'+fld('aB','Batería útil de fábrica',S.car.nominal,{unit:'kWh',min:5})+fld('aC','Consumo de referencia',S.car.cons,{unit:'kWh/100 km',min:5})+fld('aA','Carga máx. en alterna',S.car.ac,{unit:'kW',min:1})+fld('aD','Carga máx. en rápida',S.car.dc,{unit:'kW',min:10})+'</div>'
-   +'<p class="muted small">La capacidad útil es la que figura en la ficha técnica del fabricante, no la bruta. Con ella se calcula el porcentaje de salud.</p></section>'
+  var html=aspectHTML()+cuentaHTML()+'<section class="card"><h2>Tu coche</h2><p class="muted small">El modelo, el kilometraje y los datos técnicos se editan ahora en <b>Coche, Ficha</b>.</p><button class="btn ghost" id="goFicha" type="button">Ir a la ficha del coche</button></section>'
    +'<section class="card"><h3>Precios por defecto</h3><div class="grid3">'+fld('pCa','Casa',S.price.casa,{unit:'€/kWh',min:0})+fld('pAc','Pública lenta',S.price.ac,{unit:'€/kWh',min:0})+fld('pDc','Pública rápida',S.price.dc,{unit:'€/kWh',min:0})+'</div>'
    +'<div class="grid2">'+fld('gP','Gasolina',S.gas.price,{unit:'€/L',min:0})+fld('gL','Consumo gasolina',S.gas.l100,{unit:'L/100 km',min:1})+'</div></section>'
    +'<section class="card"><h3>Pérdidas de carga</h3><p class="muted small">Porcentaje de la energía anotada que llega a la batería. Si el contador está en tu enchufe, las pérdidas son mayores que si lo marca el cargador público. Estos valores afectan a la estimación de salud.</p><div class="grid3">'+fld('eCa','Casa',round(S.eff.casa*100,0),{unit:'%',min:70,max:100})+fld('eAc','Pública lenta',round(S.eff.ac*100,0),{unit:'%',min:70,max:100})+fld('eDc','Pública rápida',round(S.eff.dc*100,0),{unit:'%',min:70,max:100})+'</div></section>'
@@ -1070,12 +1232,9 @@ function viewAjustes(){
    +'<p class="muted small">La copia es un archivo con todos tus datos, sin la clave de Open Charge Map. Sirve para pasarlos entre la versión de Claude y la instalable, o para guardarlos. Restaurar sustituye lo que tengas ahora.</p>'
    +'<button class="btn ghost" id="resetAll" type="button">'+(resetArm?'Pulsa otra vez para borrarlo todo':'Borrar todos los datos')+'</button></section>';
   return {html:html,bind:function(){
+    $('#goFicha').addEventListener('click',function(){CT.tab='ficha';go('coche')});
+    aspectBind();cuentaBind();
     var b=function(id,fn){$('#'+id).addEventListener('input',function(e){fn(e.target.value);save()})};
-    b('aN',function(v){S.car.name=v||'Mi eléctrico'});
-    b('aB',function(v){S.car.nominal=Math.max(5,num(v,60))});
-    b('aC',function(v){S.car.cons=Math.max(5,num(v,16))});
-    b('aA',function(v){S.car.ac=Math.max(1,num(v,11))});
-    b('aD',function(v){S.car.dc=Math.max(10,num(v,100))});
     b('pCa',function(v){S.price.casa=num(v)});b('pAc',function(v){S.price.ac=num(v)});b('pDc',function(v){S.price.dc=num(v)});
     b('gP',function(v){S.gas.price=num(v)});b('gL',function(v){S.gas.l100=Math.max(1,num(v,6))});
     b('eCa',function(v){S.eff.casa=clamp(num(v,90),70,100)/100});b('eAc',function(v){S.eff.ac=clamp(num(v,93),70,100)/100});b('eDc',function(v){S.eff.dc=clamp(num(v,96),70,100)/100});
@@ -1198,8 +1357,8 @@ function routeGo(){
     pos.forEach(function(dk){chain=chain.then(function(){
       var p=pointAt(route.geometry.coordinates,total,dk);
       return jget('https://api.openchargemap.io/v3/poi?output=json&latitude='+p.lat.toFixed(5)+'&longitude='+p.lon.toFixed(5)+'&distance=12&distanceunit=KM&maxresults=150&compact=false&verbose=false&countrycode=ES&key='+encodeURIComponent(key),25000).then(function(arr){
-        var pts=(Array.isArray(arr)?arr:[]).map(normOCM).filter(function(q){return q&&q.s!=='fuera'&&q.kw>=50});
-        pts.sort(function(a,b){return (b.free-a.free)||(b.kw-a.kw)});
+        var pts=(Array.isArray(arr)?arr:[]).map(normPOI).filter(function(q){return q&&q.s!=='fuera'&&q.kw>=50});
+        pts.sort(function(a,b){var o={free:0,maybe:1,other:2};return (o[a.cls]-o[b.cls])||(b.kw-a.kw)});
         RT.stops.push({km:dk,pts:pts.slice(0,3)});
       });
     })});
@@ -1212,7 +1371,7 @@ function rtHTML(){
   if(RT.status)h+='<p class="note '+(RT.busy?'ok':'warn')+'">'+esc(RT.status)+'</p>';
   if(RT.stops&&RT.stops.length)h+=RT.stops.map(function(st,i){
     return '<div class="planbox"><b>Parada '+(i+1)+' · hacia el km '+nf(st.km,0)+'</b>'
-     +(st.pts.length?st.pts.map(function(p){return '<div class="rowl"><div class="t"><b>'+esc(p.n)+'</b><span class="muted small">'+nf(p.kw)+' kW · '+(p.free?'marcado como gratis':'precio: '+(p.cost?esc(p.cost):'sin dato'))+(p.op?' · '+esc(p.op):'')+'</span></div><a class="link small" href="https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon+'" target="_blank" rel="noopener">Ir</a></div>'}).join(''):'<p class="muted small">No hay cargadores rápidos registrados cerca de este punto. Prueba a adelantar o retrasar la parada.</p>')+'</div>';
+     +(st.pts.length?st.pts.map(function(p){return '<div class="rowl"><div class="t"><b>'+esc(p.n)+'</b><span class="muted small">'+nf(p.kw)+' kW · '+(p.cls==='free'?'marcado como gratis':(p.cls==='maybe'?'posible gratis':'precio: '+(p.cost?esc(p.cost):'sin dato')))+(p.op?' · '+esc(p.op):'')+'</span></div><a class="link small" href="https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon+'" target="_blank" rel="noopener">Ir</a></div>'}).join(''):'<p class="muted small">No hay cargadores rápidos registrados cerca de este punto. Prueba a adelantar o retrasar la parada.</p>')+'</div>';
   }).join('');
   return h;
 }
@@ -1248,8 +1407,323 @@ function yearHTML(){
    +'<div class="note ok">Con ese gasto has recorrido unos '+nf(km,0)+' km (estimado). En gasolina habrían costado unos <b>'+eur(gas,0)+'</b>: ahorras unos <b>'+eur(Math.max(0,gas-e),0)+'</b>.</div>';
 }
 
+
+/* ---------- COCHE: ficha, gastos y avisos ---------- */
+var CT={tab:'bat'};
+var COSTCATS=[['mant','Mantenimiento y taller'],['itv','ITV'],['seg','Seguro'],['imp','Impuesto de circulación'],['neu','Neumáticos'],['par','Parking y garaje'],['peaje','Peajes'],['lav','Lavado'],['multa','Multas'],['otro','Otros']];
+function catName(k){for(var i=0;i<COSTCATS.length;i++)if(COSTCATS[i][0]===k)return COSTCATS[i][1];return k==='carga'?'Carga':k}
+var GF={edit:null,cat:'mant'};
+var RF={edit:null,cat:'mant',n:'',date:'',km:'',everM:'',everK:''};
+var TEMPL=[
+ {n:'ITV',cat:'itv',everM:12,everK:''},
+ {n:'Seguro',cat:'seg',everM:12,everK:''},
+ {n:'Impuesto de circulación',cat:'imp',everM:12,everK:''},
+ {n:'Revisión del coche',cat:'mant',everM:12,everK:15000},
+ {n:'Líquido de frenos',cat:'mant',everM:24,everK:''},
+ {n:'Filtro del habitáculo',cat:'mant',everM:12,everK:''},
+ {n:'Cambio de neumáticos',cat:'neu',everM:'',everK:40000}
+];
+function today0(){var d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate())}
+function addMonths(s,n){var d=parseD(s),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+n);var last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day,last));return iso(d)}
+function curOdo(){
+  var m=num(S.car.odo,0);
+  S.log.forEach(function(l){if(l.odo>m)m=l.odo});
+  S.costs.forEach(function(c){if(c.km>m)m=c.km});
+  return m;
+}
+function remInfo(r){
+  var o=curOdo(),days=null,kmLeft=null,parts=[],st='ok';
+  if(r.date){days=Math.round((parseD(r.date)-today0())/86400000)}
+  if(r.km>0&&o>0)kmLeft=r.km-o;
+  if(days!==null){parts.push(days<0?'caducó hace '+(-days)+' días':(days===0?'es hoy':'en '+days+' días')+' ('+dmy(r.date)+')');if(days<0)st='bad';else if(days<=30&&st!=='bad')st='warn'}
+  if(r.km>0){if(kmLeft!==null){parts.push(kmLeft<=0?'te has pasado '+nf(-kmLeft)+' km':'faltan '+nf(kmLeft)+' km (a '+nf(r.km)+' km)');if(kmLeft<=0)st='bad';else if(kmLeft<=1000&&st!=='bad')st='warn'}else parts.push('a los '+nf(r.km)+' km (indica tu kilometraje en Ficha)')}
+  if(!r.date&&!(r.km>0))parts.push('sin fecha ni kilometraje');
+  return {days:days,kmLeft:kmLeft,state:st,txt:parts.join(' · '),score:st==='bad'?0:(st==='warn'?1:2)};
+}
+function remSorted(){
+  return S.rem.map(function(r){return {r:r,i:remInfo(r)}}).sort(function(a,b){
+    if(a.i.score!==b.i.score)return a.i.score-b.i.score;
+    var da=a.i.days===null?99999:a.i.days,db=b.i.days===null?99999:b.i.days;return da-db;
+  });
+}
+function remAlertsHTML(){
+  var L=remSorted().filter(function(x){return x.i.score<2}).slice(0,3);
+  if(!L.length)return '';
+  return '<section class="card"><div class="head"><h3>Avisos del coche</h3><button class="btn ghost sm" type="button" data-go="avisos">Ver todos</button></div>'
+   +L.map(function(x){return '<div class="rowl"><div class="t"><b>'+esc(x.r.n)+'</b><span class="muted small">'+esc(x.i.txt)+'</span></div><span class="pill '+x.i.state+'">'+(x.i.state==='bad'?'Pendiente':'Pronto')+'</span></div>'}).join('')+'</section>';
+}
+function remAdvance(r){
+  var o=curOdo();
+  if(r.everM>0)r.date=addMonths(r.date&&parseD(r.date)>today0()?r.date:iso(new Date()),r.everM);
+  if(r.everK>0)r.km=Math.max(o,0)+r.everK;
+}
+function remAutoRenew(cat){
+  var L=S.rem.filter(function(r){return r.cat===cat&&(r.everM>0||r.everK>0)});
+  if(L.length!==1||cat==='mant'||cat==='otro')return '';
+  remAdvance(L[0]);return ' Aviso «'+L[0].n+'» renovado.';
+}
+/* ---- Ficha ---- */
+function fichaView(){
+  var c=S.car;
+  var html='<section class="card"><h2>Ficha del coche</h2>'
+   +fld('fN','Nombre en la app',c.name,{type:'text'})
+   +'<div class="grid2">'+fld('fM','Marca y modelo',c.model||'',{type:'text',data:'placeholder="Ej.: MG4 Luxury"'})+fld('fY','Año',c.year||'',{type:'text'})+fld('fP','Matrícula (opcional)',c.plate||'',{type:'text'})+fld('fO','Kilometraje actual',c.odo||'',{unit:'km',min:0})+'</div>'
+   +'<p class="muted small">El kilometraje se actualiza solo cuando apuntas el odómetro en una carga o un gasto. Los avisos por kilómetros lo usan.</p></section>'
+   +'<section class="card"><h3>Datos técnicos</h3><div class="grid2">'+fld('aB','Batería útil de fábrica',c.nominal,{unit:'kWh',min:5})+fld('aC','Consumo de referencia',c.cons,{unit:'kWh/100 km',min:5})+fld('aA','Carga máx. en alterna',c.ac,{unit:'kW',min:1})+fld('aD','Carga máx. en rápida',c.dc,{unit:'kW',min:10})+fld('aR','Autonomía de fábrica (opcional)',c.range||'',{unit:'km',min:0})+'</div>'
+   +'<p class="muted small">Búscalos en la ficha técnica o el manual de tu coche. Usa la capacidad útil, no la bruta: con ella se calcula la salud de la batería.</p></section>';
+  return {html:html,bind:function(){
+    var b=function(id,fn){$('#'+id).addEventListener('input',function(e){fn(e.target.value);save()})};
+    b('fN',function(v){S.car.name=v||'Mi eléctrico'});b('fM',function(v){S.car.model=v});b('fY',function(v){S.car.year=v});b('fP',function(v){S.car.plate=v});
+    b('fO',function(v){S.car.odo=Math.max(0,num(v,0))});
+    b('aB',function(v){S.car.nominal=Math.max(5,num(v,60))});b('aC',function(v){S.car.cons=Math.max(5,num(v,16))});b('aA',function(v){S.car.ac=Math.max(1,num(v,11))});b('aD',function(v){S.car.dc=Math.max(10,num(v,100))});b('aR',function(v){S.car.range=Math.max(0,num(v,0))});
+  }};
+}
+/* ---- Gastos ---- */
+function costRows(from){
+  var rows=[];
+  S.costs.forEach(function(c){if(c.date>=from)rows.push({cat:c.cat,amt:c.amt})});
+  S.log.forEach(function(l){if(l.date>=from)rows.push({cat:'carga',amt:l.cost})});
+  return rows;
+}
+function gastosSummaryHTML(){
+  var from=addMonths(iso(new Date()),-12),rows=costRows(from),by={},tot=0;
+  rows.forEach(function(r){by[r.cat]=(by[r.cat]||0)+r.amt;tot+=r.amt});
+  if(!rows.length||tot<=0)return '<p class="muted small">Apunta gastos o cargas y verás aquí el coste real de tener el coche.</p>';
+  var cats=Object.keys(by).map(function(k){return {k:k,v:by[k]}}).sort(function(a,b){return b.v-a.v});
+  var mx=cats[0].v||1;
+  var odos=[];S.log.forEach(function(l){if(l.date>=from&&l.odo>0)odos.push(l.odo)});S.costs.forEach(function(c){if(c.date>=from&&c.km>0)odos.push(c.km)});
+  var km=odos.length>1?Math.max.apply(null,odos)-Math.min.apply(null,odos):0;
+  var out='<div class="grid2">'+kv(eur(tot,0),'Últimos 12 meses')+kv(eur(tot/12,0),'Al mes de media')+(km>=200?kv(eur(tot/km*100),'Cada 100 km (aprox.)'):kv('—','Cada 100 km'))+kv(String(rows.length),'Apuntes')+'</div>';
+  out+='<div class="bars">'+cats.map(function(c,i){return '<div class="barrow'+(i===0?' best':'')+'"><span>'+esc(catName(c.k))+' <span class="muted small">· '+nf(c.v/tot*100,0)+' %</span></span><b class="num">'+eur(c.v,0)+'</b><div class="trk"><i style="width:'+Math.max(3,c.v/mx*100).toFixed(0)+'%"></i></div></div>'}).join('')+'</div>';
+  out+='<details class="tbl"><summary>Ver tabla de datos</summary><div class="tblwrap"><table><thead><tr><th>Concepto</th><th>Importe</th><th>%</th></tr></thead><tbody>'+cats.map(function(c){return '<tr><td>'+esc(catName(c.k))+'</td><td>'+eur(c.v)+'</td><td>'+nf(c.v/tot*100,0)+' %</td></tr>'}).join('')+'</tbody></table></div></details>';
+  if(km<200)out+='<p class="muted small">El coste por 100 km aparece cuando hay al menos 200 km entre tus odómetros apuntados.</p>';
+  return out;
+}
+function gastosView(){
+  var E=GF.edit?S.costs.filter(function(c){return c.id===GF.edit})[0]:null;if(GF.edit&&!E)GF.edit=null;
+  var sorted=S.costs.slice().sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0)});
+  var cat=E?E.cat:GF.cat;
+  var html='<section class="card"><div class="head"><h2>Coste del coche</h2><span class="tag">carga incluida</span></div>'+gastosSummaryHTML()+'</section>'
+   +'<section class="card" id="gfCard"><h3>'+(E?'Editar gasto':'Añadir gasto')+'</h3><form id="gForm" style="display:flex;flex-direction:column;gap:10px">'
+   +'<label class="f" for="gCat">Tipo<select id="gCat">'+COSTCATS.map(function(c){return '<option value="'+c[0]+'"'+(cat===c[0]?' selected':'')+'>'+c[1]+'</option>'}).join('')+'</select></label>'
+   +'<div class="grid2">'+fld('gDate','Fecha',E?E.date:iso(new Date()),{type:'date'})+fld('gAmt','Importe',E?E.amt:'',{unit:'€',min:0})+'</div>'
+   +fld('gKm','Kilómetros del coche (opcional)',E&&E.km?E.km:'',{unit:'km',min:0})
+   +fld('gNote','Detalle (taller, qué se hizo…)',E?E.note||'':'',{type:'text'})
+   +'<button class="btn" type="submit">'+(E?'Guardar cambios':'Guardar gasto')+'</button>'+(E?'<button class="btn ghost" id="gCancel" type="button">Cancelar</button>':'')+'</form></section>'
+   +'<section class="card"><h3>Historial de gastos</h3>'
+   +(sorted.length?sorted.map(function(c){return '<div class="rowl"><div class="t"><b class="num">'+dmy(c.date)+' · '+esc(catName(c.cat))+' · '+eur(c.amt)+'</b><span class="muted small">'+(c.note?esc(c.note):'Sin detalle')+(c.km?' · '+nf(c.km)+' km':'')+'</span></div><span style="display:flex;gap:6px;align-items:center"><button type="button" class="btn ghost sm" data-egc="'+esc(c.id)+'">Editar</button><button type="button" class="x" data-dgc="'+esc(c.id)+'" aria-label="Borrar gasto">×</button></span></div>'}).join(''):'<p class="muted">Todavía no hay gastos. Apunta el seguro, la ITV, un cambio de neumáticos o una revisión.</p>')+'</section>';
+  return {html:html,bind:function(){
+    $('#gCat').addEventListener('change',function(e){if(!E)GF.cat=e.target.value});
+    $('#gForm').addEventListener('submit',function(e){
+      e.preventDefault();
+      var amt=num($('#gAmt').value,-1),km=num($('#gKm').value,0),ct=$('#gCat').value;
+      if(!(amt>=0)||$('#gAmt').value.trim()===''){toast('Indica el importe');return}
+      var rec={date:$('#gDate').value||iso(new Date()),cat:ct,amt:amt,km:km>0?km:0,note:$('#gNote').value.trim()};
+      var extra='';
+      if(E){for(var k in rec)E[k]=rec[k];GF.edit=null;save();render();toast('Gasto actualizado');return}
+      rec.id=uid();S.costs.push(rec);extra=remAutoRenew(ct);GF.edit=null;save();render();toast('Gasto guardado.'+extra);
+    });
+    $$('[data-dgc]').forEach(function(b){b.addEventListener('click',function(){S.costs=S.costs.filter(function(c){return c.id!==b.dataset.dgc});if(GF.edit===b.dataset.dgc)GF.edit=null;save();render()})});
+    $$('[data-egc]').forEach(function(b){b.addEventListener('click',function(){GF.edit=b.dataset.egc;render();var c=$('#gfCard');if(c&&c.scrollIntoView)c.scrollIntoView({behavior:'smooth',block:'start'})})});
+    var cc=$('#gCancel');if(cc)cc.addEventListener('click',function(){GF.edit=null;render()});
+  }};
+}
+/* ---- Avisos ---- */
+function icsEscape(s){return String(s).replace(/\\/g,'\\\\').replace(/;/g,'\;').replace(/,/g,'\\,').replace(/\n/g,'\\n')}
+function icsText(){
+  var L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Vatio EV//ES','CALSCALE:GREGORIAN'];
+  var stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+  S.rem.forEach(function(r){
+    if(!r.date)return;
+    var d=r.date.replace(/-/g,''),e=addMonths(r.date,0),nd=parseD(r.date);nd.setDate(nd.getDate()+1);var end=iso(nd).replace(/-/g,'');
+    L.push('BEGIN:VEVENT','UID:'+r.id+'@vatio','DTSTAMP:'+stamp,'DTSTART;VALUE=DATE:'+d,'DTEND;VALUE=DATE:'+end,'SUMMARY:'+icsEscape(r.n+' ('+S.car.name+')'),
+      'DESCRIPTION:'+icsEscape('Aviso de Vatio EV. '+catName(r.cat)),
+      'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+icsEscape(r.n),'TRIGGER:-P7D','END:VALARM',
+      'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+icsEscape(r.n),'TRIGGER:-P1D','END:VALARM','END:VEVENT');
+  });
+  L.push('END:VCALENDAR');return L.join('\r\n');
+}
+function avisosView(){
+  var E=RF.edit?S.rem.filter(function(r){return r.id===RF.edit})[0]:null;if(RF.edit&&!E)RF.edit=null;
+  var v=E?{n:E.n,cat:E.cat,date:E.date||'',km:E.km||'',everM:E.everM||'',everK:E.everK||''}:RF;
+  var list=remSorted(),o=curOdo();
+  var html='<section class="card"><div class="head"><h2>Avisos</h2><span class="muted small">'+(o>0?'Km actuales: '+nf(o):'Indica tus km en Ficha')+'</span></div>'
+   +(list.length?list.map(function(x){var r=x.r;return '<div class="rowl" style="align-items:flex-start"><div class="t"><b>'+esc(r.n)+'</b><span class="muted small">'+esc(x.i.txt)+(r.everM>0||r.everK>0?' · se repite cada '+[r.everM>0?r.everM+' meses':'',r.everK>0?nf(r.everK)+' km':''].filter(Boolean).join(' o '):'')+'</span></div><span style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><span class="pill '+x.i.state+'">'+(x.i.state==='bad'?'Pendiente':(x.i.state==='warn'?'Pronto':'Al día'))+'</span><span style="display:flex;gap:6px"><button type="button" class="btn ghost sm" data-rdone="'+esc(r.id)+'">'+(r.everM>0||r.everK>0?'Hecho':'Quitar')+'</button><button type="button" class="btn ghost sm" data-redit="'+esc(r.id)+'">Editar</button><button type="button" class="x" data-rdel="'+esc(r.id)+'" aria-label="Borrar aviso">×</button></span></span></div>'}).join(''):'<p class="muted">Todavía no tienes avisos. Usa una de las plantillas de abajo o crea el tuyo.</p>')
+   +'<p class="muted small">Los avisos saltan en Inicio cuando abres la app (a 30 días de la fecha o a 1.000 km). La app no puede avisarte con ella cerrada: para eso, descarga los avisos con fecha al calendario del móvil.</p>'
+   +(HOSTED?'<button class="btn ghost" id="rIcs" type="button">Descargar avisos para el calendario (.ics)</button>':'<p class="note">La descarga al calendario necesita la versión instalable de Vatio.</p>')+'</section>'
+   +(E?'':'<section class="card"><h3>Plantillas</h3><p class="muted small">Rellenan el formulario con intervalos típicos. Ajusta los valores al manual de tu coche.</p><div class="chips">'+TEMPL.map(function(t,i){return '<button type="button" class="chip" data-tpl="'+i+'">'+esc(t.n)+'</button>'}).join('')+'</div></section>')
+   +'<section class="card" id="rfCard"><h3>'+(E?'Editar aviso':'Nuevo aviso')+'</h3><form id="rForm" style="display:flex;flex-direction:column;gap:10px">'
+   +fld('rN','Qué hay que hacer',v.n,{type:'text',data:'placeholder="ITV, seguro, revisión…"'})
+   +'<label class="f" for="rCat">Tipo (para renovar el aviso al apuntar el gasto)<select id="rCat">'+COSTCATS.map(function(c){return '<option value="'+c[0]+'"'+(v.cat===c[0]?' selected':'')+'>'+c[1]+'</option>'}).join('')+'</select></label>'
+   +'<div class="grid2">'+fld('rDate','Fecha límite',v.date,{type:'date'})+fld('rKm','O a los (km)',v.km,{unit:'km',min:0})+fld('rEM','Se repite cada',v.everM,{unit:'meses',min:0})+fld('rEK','O cada',v.everK,{unit:'km',min:0})+'</div>'
+   +'<p class="muted small">Puedes poner fecha, kilómetros o las dos cosas. Avisa con lo que llegue primero. Al marcarlo como hecho se calcula el siguiente.</p>'
+   +'<button class="btn" type="submit">'+(E?'Guardar cambios':'Guardar aviso')+'</button>'+(E?'<button class="btn ghost" id="rCancel" type="button">Cancelar</button>':'')+'</form></section>';
+  return {html:html,bind:function(){
+    $$('[data-tpl]').forEach(function(b){b.addEventListener('click',function(){var t=TEMPL[+b.dataset.tpl];RF={edit:null,cat:t.cat,n:t.n,date:'',km:'',everM:t.everM,everK:t.everK};render();var c=$('#rfCard');if(c&&c.scrollIntoView)c.scrollIntoView({behavior:'smooth',block:'start'})})});
+    $('#rForm').addEventListener('submit',function(e){
+      e.preventDefault();
+      var n=$('#rN').value.trim(),date=$('#rDate').value||'',km=Math.max(0,num($('#rKm').value,0)),em=Math.max(0,Math.round(num($('#rEM').value,0))),ek=Math.max(0,num($('#rEK').value,0));
+      if(!n){toast('Escribe qué hay que hacer');return}
+      if(!date&&!(km>0)){toast('Indica una fecha o unos kilómetros');return}
+      var rec={n:n,cat:$('#rCat').value,date:date,km:km,everM:em,everK:ek};
+      if(E){for(var k in rec)E[k]=rec[k];RF={edit:null,cat:'mant',n:'',date:'',km:'',everM:'',everK:''};save();render();toast('Aviso actualizado');return}
+      rec.id=uid();S.rem.push(rec);RF={edit:null,cat:'mant',n:'',date:'',km:'',everM:'',everK:''};save();render();toast('Aviso guardado');
+    });
+    $$('[data-rdel]').forEach(function(b){b.addEventListener('click',function(){S.rem=S.rem.filter(function(r){return r.id!==b.dataset.rdel});if(RF.edit===b.dataset.rdel)RF.edit=null;save();render()})});
+    $$('[data-redit]').forEach(function(b){b.addEventListener('click',function(){RF.edit=b.dataset.redit;render();var c=$('#rfCard');if(c&&c.scrollIntoView)c.scrollIntoView({behavior:'smooth',block:'start'})})});
+    $$('[data-rdone]').forEach(function(b){b.addEventListener('click',function(){
+      var r=S.rem.filter(function(x){return x.id===b.dataset.rdone})[0];if(!r)return;
+      if(r.everM>0||r.everK>0){remAdvance(r);save();render();toast('Aviso renovado. Apunta el gasto en Gastos si lo hubo.')}
+      else{S.rem=S.rem.filter(function(x){return x.id!==r.id});save();render();toast('Aviso quitado')}
+    })});
+    var cc=$('#rCancel');if(cc)cc.addEventListener('click',function(){RF.edit=null;render()});
+    var ics=$('#rIcs');if(ics)ics.addEventListener('click',function(){
+      if(!S.rem.some(function(r){return r.date})){toast('Ningún aviso tiene fecha');return}
+      saveFile('avisos-vatio.ics',icsText(),icsText());
+    });
+  }};
+}
+function viewCoche(){
+  var seghtml='<section class="card" style="gap:10px">'+seg([['bat','Batería'],['gastos','Gastos'],['avisos','Avisos'],['ficha','Ficha']],CT.tab,'ctSeg')+'</section>';
+  var sub=CT.tab==='gastos'?gastosView():(CT.tab==='avisos'?avisosView():(CT.tab==='ficha'?fichaView():viewBateria()));
+  return {html:seghtml+sub.html,bind:function(){onSeg($('#ctSeg').parentNode,function(v){CT.tab=v;render()});if(sub.bind)sub.bind()}};
+}
+
+
+/* ---------- ASPECTO ---------- */
+function aspectHTML(){
+  var u=S.ui,dark=isDark();
+  return '<section class="card"><h2>Aspecto</h2><div class="grid2">'
+   +Object.keys(PALS).map(function(k){return '<button type="button" class="sw" data-pal="'+k+'" aria-pressed="'+(u.pal===k)+'" style="--c:'+PALS[k][dark?'d':'l']+'"><i></i>'+PALS[k].n+'</button>'}).join('')
+   +'<button type="button" class="sw" data-pal="custom" aria-pressed="'+(u.pal==='custom')+'" style="--c:'+esc(u.custom||'#0A7C78')+'"><i></i>Personalizado</button></div>'
+   +(u.pal==='custom'?'<label class="f" for="uCustom">Tu color<input id="uCustom" type="color" value="'+esc(u.custom||'#0A7C78')+'"></label><p class="muted small">Si el color es muy claro o muy oscuro, la app lo ajusta sola para que el texto se lea bien.</p>':'')
+   +'<div><div class="muted small" style="margin-bottom:6px">Modo</div>'+seg([['auto','Automático'],['light','Claro'],['dark','Oscuro']],S.theme||'auto','uMode')+'</div>'
+   +'<div><div class="muted small" style="margin-bottom:6px">Tamaño de letra</div>'+seg([['14','Pequeña'],['15','Normal'],['17','Grande'],['19','Muy grande']],String(u.fs||15),'uFs')+'</div>'
+   +'<div><div class="muted small" style="margin-bottom:6px">Esquinas</div>'+seg([['sm','Rectas'],['md','Redondas'],['lg','Muy redondas']],u.round||'md','uRound')+'</div>'
+   +'<div><div class="muted small" style="margin-bottom:6px">Animaciones</div>'+seg([['on','Activadas'],['off','Desactivadas']],u.anim===false?'off':'on','uAnim')+'</div></section>';
+}
+function aspectBind(){
+  var u=S.ui;
+  $$('[data-pal]').forEach(function(b){b.addEventListener('click',function(){u.pal=b.dataset.pal;save();applyTheme();render()})});
+  var c=$('#uCustom');if(c)c.addEventListener('input',function(e){u.custom=e.target.value;save();applyTheme()});
+  onSeg($('#uMode').parentNode,function(v){S.theme=v;save();applyTheme();render()});
+  onSeg($('#uFs').parentNode,function(v){u.fs=parseInt(v,10)||15;save();applyTheme();render()});
+  onSeg($('#uRound').parentNode,function(v){u.round=v;save();applyTheme();render()});
+  onSeg($('#uAnim').parentNode,function(v){u.anim=(v==='on');save();applyTheme();render()});
+}
+
+/* ---------- CUENTA Y NUBE (Firebase por REST, solo versión alojada) ---------- */
+var FBK='vatio.fb',FBS='vatio.fbs';
+var CL={cfg:null,sess:null,status:'',busy:false,timer:null,last:0,msg:''};
+function clLoad(){try{CL.cfg=JSON.parse(localStorage.getItem(FBK)||'null')}catch(e){CL.cfg=null}try{CL.sess=JSON.parse(localStorage.getItem(FBS)||'null')}catch(e){CL.sess=null}}
+function clPut(k,v){try{if(v)localStorage.setItem(k,JSON.stringify(v));else localStorage.removeItem(k)}catch(e){}}
+clLoad();
+function clReady(){return !!(HOSTED&&CL.cfg&&CL.cfg.apiKey&&CL.cfg.projectId)}
+function clOn(){return !!(clReady()&&CL.sess&&CL.sess.refresh)}
+var FB_ERR={EMAIL_EXISTS:'Ese correo ya tiene una cuenta. Prueba a entrar.',INVALID_LOGIN_CREDENTIALS:'Correo o contraseña incorrectos.',INVALID_PASSWORD:'Correo o contraseña incorrectos.',EMAIL_NOT_FOUND:'Correo o contraseña incorrectos.',INVALID_EMAIL:'El correo no es válido.',MISSING_PASSWORD:'Escribe la contraseña.',OPERATION_NOT_ALLOWED:'Activa el acceso con correo y contraseña en Firebase (Authentication).',TOO_MANY_ATTEMPTS_TRY_LATER:'Demasiados intentos. Espera unos minutos.',USER_DISABLED:'Esa cuenta está desactivada.',API_KEY_INVALID:'La apiKey de Firebase no es válida.',PERMISSION_DENIED:'Firestore ha rechazado el acceso. Revisa las reglas de seguridad.',PROJECT_NOT_FOUND:'No se encuentra el proyecto de Firebase. Revisa el projectId.'};
+function fbMsg(j,st){
+  var m=j&&j.error&&j.error.message?String(j.error.message):'';
+  if(/WEAK_PASSWORD/.test(m))return 'La contraseña debe tener al menos 6 caracteres.';
+  var k=m.split(' ')[0].split(':')[0];
+  if(FB_ERR[k])return FB_ERR[k];
+  var s=j&&j.error&&j.error.status;if(s&&FB_ERR[s])return FB_ERR[s];
+  if(st===403)return FB_ERR.PERMISSION_DENIED;
+  return 'Error de Firebase'+(m?': '+m:' ('+st+')');
+}
+function fbJson(url,opt){
+  return fetch(url,opt).then(function(r){return r.text().then(function(t){var j=null;try{j=t?JSON.parse(t):null}catch(e){}if(!r.ok){var e=new Error(fbMsg(j,r.status));e.status=r.status;throw e}return j})});
+}
+function clSetSess(j){CL.sess={uid:j.localId||j.user_id,email:j.email||(CL.sess&&CL.sess.email)||'',idToken:j.idToken||j.id_token,refresh:j.refreshToken||j.refresh_token,exp:Date.now()+(parseInt(j.expiresIn||j.expires_in,10)||3600)*1000};clPut(FBS,CL.sess)}
+function clAuth(mode,email,pass){
+  var ep=mode==='up'?'signUp':'signInWithPassword';
+  return fbJson('https://identitytoolkit.googleapis.com/v1/accounts:'+ep+'?key='+encodeURIComponent(CL.cfg.apiKey),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pass,returnSecureToken:true})}).then(clSetSess);
+}
+function clToken(){
+  if(CL.sess.exp-60000>Date.now())return Promise.resolve(CL.sess.idToken);
+  return fbJson('https://securetoken.googleapis.com/v1/token?key='+encodeURIComponent(CL.cfg.apiKey),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(CL.sess.refresh)}).then(function(j){clSetSess(j);return CL.sess.idToken},function(e){if(e.status===400){CL.sess=null;clPut(FBS,null)}throw e});
+}
+function clUrl(){return 'https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(CL.cfg.projectId)+'/databases/(default)/documents/users/'+encodeURIComponent(CL.sess.uid)}
+function clPull(){
+  return clToken().then(function(t){return fetch(clUrl(),{headers:{Authorization:'Bearer '+t}})}).then(function(r){
+    if(r.status===404)return null;
+    return r.text().then(function(tx){var j=null;try{j=JSON.parse(tx)}catch(e){}if(!r.ok){var e=new Error(fbMsg(j,r.status));e.status=r.status;throw e}
+      var f=j&&j.fields;if(!f||!f.json||!f.json.stringValue)return null;
+      var st=null;try{st=JSON.parse(f.json.stringValue)}catch(e2){}
+      return st?{state:st,upd:parseInt((f.upd&&f.upd.integerValue)||st.upd||0,10)||0}:null});
+  });
+}
+function clPush(){
+  var body;try{body=JSON.stringify(S)}catch(e){return Promise.reject(e)}
+  return clToken().then(function(t){return fbJson(clUrl()+'?updateMask.fieldPaths=json&updateMask.fieldPaths=upd',{method:'PATCH',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({fields:{json:{stringValue:body},upd:{integerValue:String(S.upd||0)}}})})}).then(function(){CL.last=Date.now()});
+}
+function clSetMsg(m,render_){CL.msg=m;var el=$('#clMsg');if(el)el.textContent=m}
+function clSync(manual){
+  if(!clOn()||CL.busy)return Promise.resolve();
+  CL.busy=true;clSetMsg('Sincronizando…');
+  return clPull().then(function(c){
+    if(!c){return clPush().then(function(){clSetMsg('Datos subidos a tu cuenta.')})}
+    if(c.upd>(S.upd||0)){
+      var st=c.state;S=merge(defaults(),st);S.upd=c.upd;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}applyTheme();render();clSetMsg('Se han cargado los datos más recientes de tu cuenta.');return;
+    }
+    if((S.upd||0)>c.upd)return clPush().then(function(){clSetMsg('Datos de este dispositivo subidos a tu cuenta.')});
+    clSetMsg(manual?'Todo está al día.':'');
+  }).catch(function(e){clSetMsg('No se pudo sincronizar: '+(e&&e.message?e.message:'sin conexión'))}).then(function(){CL.busy=false;var el=$('#clLast');if(el)el.textContent=CL.last?'Última subida: '+new Date(CL.last).toLocaleTimeString('es-ES'):''});
+}
+function clSchedule(){
+  if(!clOn())return;
+  clearTimeout(CL.timer);
+  CL.timer=setTimeout(function(){if(CL.busy){clSchedule();return}CL.busy=true;clPush().then(function(){clSetMsg('Guardado en tu cuenta.')},function(e){clSetMsg('No se pudo guardar en la nube: '+(e&&e.message?e.message:'sin conexión'))}).then(function(){CL.busy=false})},3000);
+}
+function cuentaHTML(){
+  if(!HOSTED)return '<section class="card"><h3>Cuenta y nube</h3><p class="muted small">Esta versión ya guarda tus datos en tu cuenta de Claude. El inicio de sesión propio es para la versión instalable.</p></section>';
+  var h='<section class="card"><h3>Cuenta y nube</h3>';
+  if(!clReady()){
+    return h+'<p class="muted small">Para guardar tus datos en la nube y usarlos desde varios dispositivos necesitas un proyecto gratuito de Firebase. Es un paso de una sola vez.</p>'
+     +'<details class="tbl"><summary>Cómo crearlo (5 pasos)</summary><div class="small" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"><span>1. Entra en <a class="link" href="https://console.firebase.google.com" target="_blank" rel="noopener">console.firebase.google.com</a> con tu cuenta de Google y crea un proyecto (puedes desactivar Analytics).</span><span>2. En «Compilación», «Authentication», pulsa «Comenzar» y activa el proveedor «Correo electrónico/contraseña».</span><span>3. En «Firestore Database», crea una base de datos en modo producción.</span><span>4. En Firestore, pestaña «Reglas», pega esto y publica:</span><div class="pre">rules_version = \'2\';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /users/{uid} {\n      allow read, write: if request.auth != null &amp;&amp; request.auth.uid == uid;\n    }\n  }\n}</div><span>5. En «Configuración del proyecto», «General», crea una app web (icono &lt;/&gt;) y copia el bloque «firebaseConfig». Pégalo aquí abajo.</span><span class="muted">Los nombres de los menús pueden variar un poco: Firebase cambia a menudo su consola.</span></div></details>'
+     +'<label class="f" for="fbCfg">Configuración de Firebase<textarea id="fbCfg" rows="5" style="width:100%;border:1px solid var(--line);border-radius:var(--r-sm);padding:10px;background:var(--surface2)" placeholder="const firebaseConfig = { apiKey: \'…\', projectId: \'…\' }"></textarea></label>'
+     +'<button class="btn" id="fbSaveCfg" type="button">Guardar configuración</button><p class="note" id="clMsg" hidden></p></section>';
+  }
+  if(!clOn()){
+    return h+'<p class="muted small">Proyecto: <b>'+esc(CL.cfg.projectId)+'</b>. Entra o crea tu cuenta con un correo y una contraseña de al menos 6 caracteres.</p>'
+     +fld('fbEm','Correo','',{type:'text',data:'autocomplete="email" inputmode="email"'})
+     +'<label class="f" for="fbPw">Contraseña<span class="fieldrow"><input id="fbPw" type="password" autocomplete="current-password"></span></label>'
+     +'<div class="grid2"><button class="btn" id="fbIn" type="button">Entrar</button><button class="btn ghost" id="fbUp" type="button">Crear cuenta</button></div>'
+     +'<button class="btn ghost sm" id="fbReset" type="button" style="align-self:flex-start">He olvidado la contraseña</button>'
+     +'<p class="note" id="clMsg"'+(CL.msg?'':' hidden')+'>'+esc(CL.msg)+'</p>'
+     +'<button class="btn ghost sm" id="fbDropCfg" type="button" style="align-self:flex-start">Cambiar la configuración de Firebase</button></section>';
+  }
+  return h+'<div class="rowl"><div class="t"><b>'+esc(CL.sess.email||'Sesión iniciada')+'</b><span class="muted small" id="clLast">'+(CL.last?'Última subida: '+new Date(CL.last).toLocaleTimeString('es-ES'):'Los cambios se suben solos unos segundos después de guardarlos.')+'</span></div><span class="pill ok">Conectado</span></div>'
+   +'<div class="grid2"><button class="btn" id="fbSync" type="button">Sincronizar ahora</button><button class="btn ghost" id="fbOut" type="button">Cerrar sesión</button></div>'
+   +'<p class="note" id="clMsg"'+(CL.msg?'':' hidden')+'>'+esc(CL.msg)+'</p>'
+   +'<p class="muted small">Si usas varios dispositivos, gana siempre la versión más reciente. Tus datos van a tu propio proyecto de Firebase; la clave de Open Charge Map no se sube.</p></section>';
+}
+function cuentaBind(){
+  if(!HOSTED)return;
+  var q=function(id,fn){var e=$(id);if(e)e.addEventListener('click',fn)};
+  var msg=function(m){var e=$('#clMsg');if(e){e.hidden=false;e.textContent=m}CL.msg=m};
+  q('#fbSaveCfg',function(){
+    var t=$('#fbCfg').value,a=(t.match(/apiKey["']?\s*[:=]\s*["']([^"']+)["']/)||[])[1],p=(t.match(/projectId["']?\s*[:=]\s*["']([^"']+)["']/)||[])[1];
+    if(!a||!p){msg('No encuentro apiKey y projectId en lo que has pegado. Copia el bloque firebaseConfig completo.');return}
+    CL.cfg={apiKey:a,projectId:p};clPut(FBK,CL.cfg);CL.msg='';render();
+  });
+  q('#fbDropCfg',function(){CL.cfg=null;CL.sess=null;clPut(FBK,null);clPut(FBS,null);CL.msg='';render()});
+  var go2=function(mode){
+    var em=$('#fbEm').value.trim(),pw=$('#fbPw').value;
+    if(!em||!pw){msg('Escribe el correo y la contraseña.');return}
+    msg('Un momento…');
+    clAuth(mode,em,pw).then(function(){CL.sess.email=em;clPut(FBS,CL.sess);CL.msg='';render();return clSync(true)}).then(function(){render()},function(e){msg(e.message)});
+  };
+  q('#fbIn',function(){go2('in')});q('#fbUp',function(){go2('up')});
+  q('#fbReset',function(){
+    var em=$('#fbEm').value.trim();if(!em){msg('Escribe tu correo arriba y vuelve a pulsar.');return}
+    fbJson('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key='+encodeURIComponent(CL.cfg.apiKey),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requestType:'PASSWORD_RESET',email:em})}).then(function(){msg('Te hemos enviado un correo para cambiar la contraseña. Mira también el spam.')},function(e){msg(e.message)});
+  });
+  q('#fbSync',function(){clSync(true).then(function(){render()})});
+  q('#fbOut',function(){CL.sess=null;clPut(FBS,null);CL.msg='Sesión cerrada. Tus datos siguen en este dispositivo.';render()});
+}
+
 /* ---------- Navegación ---------- */
-var VIEWS={inicio:viewInicio,bateria:viewBateria,cargas:viewCargas,tarifas:viewTarifas,gratis:viewGratis,ajustes:viewAjustes};
+var VIEWS={inicio:viewInicio,coche:viewCoche,cargas:viewCargas,tarifas:viewTarifas,gratis:viewGratis,ajustes:viewAjustes};
 function render(){
   hideTip();
   var v=VIEWS[tab]();
@@ -1260,6 +1734,8 @@ function render(){
   $$('#tabs button').forEach(function(b){b.setAttribute('aria-current',b.dataset.tab===tab?'page':'false')});
 }
 function go(t){
+  if(t==='bateria'){CT.tab='bat';t='coche'}
+  if(t==='avisos'){CT.tab='avisos';t='coche'}
   tab=t;render();window.scrollTo(0,0);
   try{history.replaceState(null,'','#'+t)}catch(e){}
 }
@@ -1268,9 +1744,11 @@ $$('#tabs button').forEach(function(b){b.addEventListener('click',function(){go(
 $('#themeBtn').addEventListener('click',function(){S.theme=isDark()?'light':'dark';save();applyTheme()});
 applyTheme();
 var h0=(location.hash||'').replace('#','');
+if(h0==='bateria'){h0='coche';CT.tab='bat'}
 if(VIEWS[h0])tab=h0;
 render();
 initStore();
+if(clOn())clSync(false);
 })();
 </script>
 
